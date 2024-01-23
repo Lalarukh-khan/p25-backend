@@ -223,3 +223,123 @@ app.post('/get-shipmentvalues', upload.none(),  (request, response) => {
 	return response.json({ data: results });
   });
 });
+app.post('/add-manufecturer', upload.none(),  (request, response) => {
+	const mnfid = request.body.mnfid;
+	const mnfname = request.body.mnfname;
+	const mnflocation = request.body.mnflocation;
+	const created_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
+	pool.query('INSERT INTO manufacture (mnfid, mnfname, mnflocation, created_at, updated_at) VALUES (?, ?, ?, ?, ?)', [mnfid, mnfname, mnflocation, created_at, created_at], (error, results, fields) => {
+		if (error) {
+		  return response.status(500).json({ error: 'Manufacturer not found' });
+		}
+		if(results.length === 0){
+			return response.status(500).json({ error: 'Manufacturer not created in database' });
+		}
+		return response.json({ message: 'Response: Manufacturer created successfully!'});
+	});
+});
+app.get('/get-manufacturers', (request, response) => {
+    const selectQuery = 'SELECT * FROM manufacture';
+	pool.query(selectQuery, (error, results, fields) => {
+		if (error) {
+		//   console.error('Error selecting from MySQL:', error);
+		  return response.status(500).json({ error: 'Internal Server Error' });
+		}
+		// console.log('Data selected from MySQL:', results);
+		return response.json({ data: results });
+	});
+});
+app.post('/add-serial', upload.none(),  (request, response) => {
+	const serial_id = request.body.matsid;
+	const slctshipment = request.body.slctshipment;
+	const shpquantity = request.body.shpquantity;
+	const slctmnf_id = request.body.slctmnf_id;
+	const created_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
+	pool.query('INSERT INTO material_serial (serial_id, slctshipment, shpquantity, slctmnf_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)', [serial_id, slctshipment, shpquantity, slctmnf_id, created_at, created_at], (error, results, fields) => {
+		if (error) {
+		  return response.status(500).json({ error: 'Serial not found' });
+		}
+		if(results.length === 0){
+			return response.status(500).json({ error: 'Serial not created in database' });
+		}
+		return response.json({ message: 'Response: Serial created successfully!'});
+	});
+});
+app.post('/add-warehouse', upload.none(),  (request, response) => {
+	const mnfid = request.body.mnfid;
+	const mnfname = request.body.mnfname;
+	const mnflocation = request.body.mnflocation;
+	const created_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
+	pool.query('INSERT INTO warehouse (wrhid, wrhidname, wrhidlocation, created_at, updated_at) VALUES (?, ?, ?, ?, ?)', [mnfid, mnfname, mnflocation, created_at, created_at], (error, results, fields) => {
+		if (error) {
+		  return response.status(500).json({ error: 'Warehouse not found' });
+		}
+		if(results.length === 0){
+			return response.status(500).json({ error: 'Warehouse not created in database' });
+		}
+		return response.json({ message: 'Response: Warehouse created successfully!'});
+	});
+});
+app.get('/get-warehouse', (request, response) => {
+    const selectQuery = 'SELECT * FROM warehouse';
+	pool.query(selectQuery, (error, results, fields) => {
+		if (error) {
+		//   console.error('Error selecting from MySQL:', error);
+		  return response.status(500).json({ error: 'Internal Server Error' });
+		}
+		// console.log('Data selected from MySQL:', results);
+		return response.json({ data: results });
+	});
+});
+app.post('/add-site', upload.none(),  (request, response) => {
+	const mnfid = request.body.mnfid;
+	const mnfname = request.body.mnfname;
+	const mnflocation = request.body.mnflocation;
+	const created_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
+	pool.query('INSERT INTO site (siteid, sitename, sitelocation, created_at, updated_at) VALUES (?, ?, ?, ?, ?)', [mnfid, mnfname, mnflocation, created_at, created_at], (error, results, fields) => {
+		if (error) {
+		  return response.status(500).json({ error: 'Site not found' });
+		}
+		if(results.length === 0){
+			return response.status(500).json({ error: 'Site not created in database' });
+		}
+		return response.json({ message: 'Response: Site created successfully!'});
+	});
+});
+app.get('/get-site', (request, response) => {
+    const selectQuery = 'SELECT * FROM site';
+	pool.query(selectQuery, (error, results, fields) => {
+		if (error) {
+		//   console.error('Error selecting from MySQL:', error);
+		  return response.status(500).json({ error: 'Internal Server Error' });
+		}
+		// console.log('Data selected from MySQL:', results);
+		return response.json({ data: results });
+	});
+});
+app.post('/add-company', upload.none(),  (request, response) => {
+	const mnfid = request.body.mnfid;
+	const mnfname = request.body.mnfname;
+	const mnflocation = request.body.mnflocation;
+	const created_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
+	pool.query('INSERT INTO company (compid, compname, complocation, created_at, updated_at) VALUES (?, ?, ?, ?, ?)', [mnfid, mnfname, mnflocation, created_at, created_at], (error, results, fields) => {
+		if (error) {
+		  return response.status(500).json({ error: 'Company not found' });
+		}
+		if(results.length === 0){
+			return response.status(500).json({ error: 'Company not created in database' });
+		}
+		return response.json({ message: 'Response: Company created successfully!'});
+	});
+});
+app.get('/get-company', (request, response) => {
+    const selectQuery = 'SELECT * FROM company';
+	pool.query(selectQuery, (error, results, fields) => {
+		if (error) {
+		//   console.error('Error selecting from MySQL:', error);
+		  return response.status(500).json({ error: 'Internal Server Error' });
+		}
+		// console.log('Data selected from MySQL:', results);
+		return response.json({ data: results });
+	});
+});
