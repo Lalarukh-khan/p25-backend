@@ -38,7 +38,17 @@ app.post('/login', upload.none(),  (request, response) => {
     return response.json({ message: 'Response: User logged in successfully!'});
   });
 });
-
+app.get('/get-mattypes', (request, response) => {
+    const selectQuery = 'SELECT * FROM material_types';
+	pool.query(selectQuery, (error, results, fields) => {
+		if (error) {
+		//   console.error('Error selecting from MySQL:', error);
+		  return response.status(500).json({ error: 'Internal Server Error' });
+		}
+		// console.log('Data selected from MySQL:', results);
+		return response.json({ data: results });
+	  });
+});
 app.post('/make-category', upload.none(),  (request, response) => {
 	// console.log('Received request:', request.body);
 	const category = request.body.category;
@@ -94,6 +104,7 @@ app.post('/get-subcategory', upload.none(),  (request, response) => {
   });
 });
 app.post('/add-material', upload.none(),  (request, response) => {
+	// console.log('Received request:', request.body);
 	const component = request.body.component;
 	const model = request.body.model;
 	const description = request.body.description;
@@ -123,7 +134,19 @@ app.get('/get-material', (request, response) => {
 		}
 		// console.log('Data selected from MySQL:', results);
 		return response.json({ data: results });
-	  });
+	});
+});
+app.post('/get-materialbytype', upload.none(),  (request, response) => {
+	const matid = request.body.matid;
+  pool.query(`SELECT * FROM material WHERE type = '${matid}'`, (error, results, fields) => {
+    if (error) {
+      return response.status(500).json({ error: 'Material not found' });
+    }
+	if(results.length === 0){
+		return response.status(500).json({ error: 'Material not created in database' });
+	}
+	return response.json({ data: results });
+  });
 });
 app.post('/get-materialvalues', upload.none(),  (request, response) => {
 	const matid = request.body.matid;
@@ -138,20 +161,20 @@ app.post('/get-materialvalues', upload.none(),  (request, response) => {
   });
 });
 app.post('/add-shipment', upload.none(),  (request, response) => {
-	console.log('Received request:', request.body);
 	const shipid = request.body.shipid;
 	const name = request.body.name;
 	const from = request.body.from;
 	const slctcateg = request.body.slctcateg;
 	const slctsubcateg = request.body.slctsubcateg;
 	const slctmat = request.body.slctmat;
+	const slcttype = request.body.slcttype;
 	const packingno = request.body.packingno;
 	const quantity = request.body.quantity;
 	const shipmentqty = request.body.shipmentqty;
 	const receivedqty = request.body.receivedqty;
 	const remainingqty = request.body.remainingqty;
 	const created_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
-  pool.query('INSERT INTO shipment (shipid, name, shpfrom, slctcateg, slctsubcateg, slctmat, packingno, quantity, shipmentqty, receivedqty, remainingqty, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [shipid, name, from, slctcateg, slctsubcateg, slctmat, packingno, quantity, shipmentqty, receivedqty, remainingqty, created_at, created_at], (error, results, fields) => {
+  pool.query('INSERT INTO shipment (shipid, name, shpfrom, slctcateg, slctsubcateg, slctmat, slcttype, packingno, quantity, shipmentqty, receivedqty, remainingqty, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [shipid, name, from, slctcateg, slctsubcateg, slctmat, slcttype, packingno, quantity, shipmentqty, receivedqty, remainingqty, created_at, created_at], (error, results, fields) => {
     if (error) {
       return response.status(500).json({ error: 'Shipment not found' });
     }
@@ -159,5 +182,44 @@ app.post('/add-shipment', upload.none(),  (request, response) => {
 		return response.status(500).json({ error: 'Shipment not created in database' });
 	}
     return response.json({ message: 'Response: Shipment created successfully!'});
+  });
+});
+app.get('/get-shipments', (request, response) => {
+    const selectQuery = 'SELECT * FROM shipment';
+	pool.query(selectQuery, (error, results, fields) => {
+		if (error) {
+		//   console.error('Error selecting from MySQL:', error);
+		  return response.status(500).json({ error: 'Internal Server Error' });
+		}
+		// console.log('Data selected from MySQL:', results);
+		return response.json({ data: results });
+	});
+});
+app.post('/get-shipmentvalues', upload.none(),  (request, response) => {
+	const shpid = request.body.shpid;
+  pool.query(`SELECT 
+  shipment.packingno, 
+  shipment.quantity, 
+  shipment.receivedqty,
+  shipment.remainingqty, 
+  material_category.name AS categoryname,
+  material.component AS materialname,
+  material.description AS materialdescription,
+  material.activeButtonText AS materialunit,
+  subcategory.name AS subcategoryname, 
+  material_types.name AS typename
+ FROM shipment 
+ JOIN material_category ON shipment.slctcateg = material_category.id 
+ JOIN material ON shipment.slctmat = material.id 
+ JOIN subcategory ON shipment.slctsubcateg = subcategory.id 
+ JOIN material_types ON shipment.slcttype = material_types.id  
+ WHERE shipment.id = '${shpid}'`, (error, results, fields) => {
+    if (error) {
+      return response.status(500).json({ error: 'Shipment not found' });
+    }
+	if(results.length === 0){
+		return response.status(500).json({ error: 'Shipment not created in database' });
+	}
+	return response.json({ data: results });
   });
 });
