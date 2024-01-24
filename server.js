@@ -250,20 +250,21 @@ app.get('/get-manufacturers', (request, response) => {
 	});
 });
 app.post('/add-serial', upload.none(),  (request, response) => {
-	const serial_id = request.body.matsid;
-	const slctshipment = request.body.slctshipment;
-	const shpquantity = request.body.shpquantity;
-	const slctmnf_id = request.body.slctmnf_id;
-	const created_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
-	pool.query('INSERT INTO material_serial (serial_id, slctshipment, shpquantity, slctmnf_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)', [serial_id, slctshipment, shpquantity, slctmnf_id, created_at, created_at], (error, results, fields) => {
-		if (error) {
-		  return response.status(500).json({ error: 'Serial not found' });
-		}
-		if(results.length === 0){
-			return response.status(500).json({ error: 'Serial not created in database' });
-		}
-		return response.json({ message: 'Response: Serial created successfully!'});
-	});
+	console.log('Received request:', request.body);
+	// const serial_id = request.body.matsid;
+	// const slctshipment = request.body.slctshipment;
+	// const shpquantity = request.body.shpquantity;
+	// const slctmnf_id = request.body.slctmnf_id;
+	// const created_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
+	// pool.query('INSERT INTO material_serial (serial_id, slctshipment, shpquantity, slctmnf_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)', [serial_id, slctshipment, shpquantity, slctmnf_id, created_at, created_at], (error, results, fields) => {
+	// 	if (error) {
+	// 	  return response.status(500).json({ error: 'Serial not found' });
+	// 	}
+	// 	if(results.length === 0){
+	// 		return response.status(500).json({ error: 'Serial not created in database' });
+	// 	}
+	// 	return response.json({ message: 'Response: Serial created successfully!'});
+	// });
 });
 app.post('/add-warehouse', upload.none(),  (request, response) => {
 	const mnfid = request.body.mnfid;
@@ -341,5 +342,74 @@ app.get('/get-company', (request, response) => {
 		}
 		// console.log('Data selected from MySQL:', results);
 		return response.json({ data: results });
+	});
+});
+app.post('/add-user', upload.none(),  (request, response) => {
+	const fullname = request.body.fullname;
+	const email = request.body.email;
+	const role = request.body.role;
+	const username = request.body.username;
+	const password = request.body.password;
+	const mobile = request.body.mobile;
+	const emergency = request.body.emergency;
+	const address = request.body.address;
+	const status = "Active";
+	const created_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
+	pool.query('INSERT INTO users (fullname, email, role, username, password, mobile, emergency, address, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [fullname, email, role, username, password, mobile, emergency, address, status, created_at, created_at], (error, results, fields) => {
+		if (error) {
+		  return response.status(500).json({ error: 'User not found' });
+		}
+		if(results.length === 0){
+			return response.status(500).json({ error: 'User not created in database' });
+		}
+		return response.json({ message: 'Response: User created successfully!'});
+	});
+});
+app.get('/get-user', (request, response) => {
+    const selectQuery = 'SELECT * FROM users';
+	pool.query(selectQuery, (error, results, fields) => {
+		if (error) {
+		//   console.error('Error selecting from MySQL:', error);
+		  return response.status(500).json({ error: 'Internal Server Error' });
+		}
+		// console.log('Data selected from MySQL:', results);
+		return response.json({ data: results });
+	});
+});
+app.get('/get-role', (request, response) => {
+    const selectQuery = 'SELECT * FROM user_role';
+	pool.query(selectQuery, (error, results, fields) => {
+		if (error) {
+		//   console.error('Error selecting from MySQL:', error);
+		  return response.status(500).json({ error: 'Internal Server Error' });
+		}
+		// console.log('Data selected from MySQL:', results);
+		return response.json({ data: results });
+	});
+});
+app.post('/update-role', upload.none(),  (request, response) => {
+	const role = request.body.role;
+	const add_material = request.body.add_material;
+	const mcategory = request.body.mcategory;
+	const msn = request.body.msn;
+	const manufacture = request.body.manufacture;
+	const shipment = request.body.shipment;
+	const warehouse = request.body.warehouse;
+	const site = request.body.site;
+	const company = request.body.company;
+	const sitereq = request.body.sitereq;
+	const createreq = request.body.createreq;
+	const requpdate = request.body.requpdate;
+	const userinfo = request.body.userinfo;
+	const rolecontrol = request.body.rolecontrol;
+	const updated_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
+	pool.query('UPDATE user_role SET add_material = ?, mcategory = ?, msn = ?, manufacture = ?, shipment = ?, warehouse = ?,  site = ?,  company = ?,  sitereq = ?,  createreq = ?,  requpdate = ?, userinfo = ?, rolecontrol = ?, updated_at = ? WHERE role = ?', [add_material, mcategory, msn, manufacture, shipment, warehouse, site, company, sitereq, createreq, requpdate, userinfo, rolecontrol, updated_at, role], (error, results, fields) => {
+		if (error) {
+		  return response.status(500).json({ error: 'Role not found' });
+		}
+		if(results.length === 0){
+			return response.status(500).json({ error: 'Role not updated in database' });
+		}
+		return response.json({ message: 'Response: Role updated successfully!'});
 	});
 });
