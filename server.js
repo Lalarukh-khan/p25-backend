@@ -125,6 +125,47 @@ app.post('/add-material', upload.none(),  (request, response) => {
     return response.json({ message: 'Response: Material created successfully!'});
   });
 });
+app.post('/add-material-bulk', upload.none(),  (request, response) => {
+	const component = request.body.component;
+	const model = request.body.model;
+	const description = request.body.description;
+	const partno = request.body.partno;
+	const type = request.body.type;
+	const quantity = request.body.quantity;
+	const category = request.body.category;
+	const subcategory = request.body.subcategory;
+	const activeButtonText = request.body.activeButtonText;
+	const created_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
+	const getIdByName = (tableName, columnName, value) => {
+	return new Promise((resolve, reject) => {
+	  pool.query(`SELECT id FROM ${tableName} WHERE ${columnName} = ?`, [value], (error, results) => {
+		if (error) {
+		  reject(error);
+		} else {
+		  resolve(results.length > 0 ? results[0][`id`] : null);
+		}
+	  });
+	});
+  	};
+  Promise.all([
+	getIdByName('material_category', 'name', category),
+	getIdByName('subcategory', 'name', subcategory),
+	getIdByName('material_types', 'name', type)
+  ])
+	.then(([categoryId, subcategoryId, typeId]) => {
+	  pool.query(
+		'INSERT INTO material (component, model, description, partno, type, quantity, slctcateg, slctsubcateg, activeButtonText, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [component, model, description, partno, typeId, quantity, categoryId, subcategoryId, activeButtonText, created_at, created_at], (error, results, fields) => {
+		  if (error) {
+			return response.status(500).json({ error: 'Error inserting into the database' });
+		  }
+		  return response.json({ message: `Response: Material created successfully!` });
+		}
+	  );
+	})
+	.catch(error => {
+	  return response.status(500).json({ error: 'Error querying the database for IDs' });
+	});
+});
 app.get('/get-material', (request, response) => {
     const selectQuery = 'SELECT * FROM material';
 	pool.query(selectQuery, (error, results, fields) => {
@@ -250,21 +291,51 @@ app.get('/get-manufacturers', (request, response) => {
 	});
 });
 app.post('/add-serial', upload.none(),  (request, response) => {
-	console.log('Received request:', request.body);
-	// const serial_id = request.body.matsid;
-	// const slctshipment = request.body.slctshipment;
-	// const shpquantity = request.body.shpquantity;
-	// const slctmnf_id = request.body.slctmnf_id;
-	// const created_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
-	// pool.query('INSERT INTO material_serial (serial_id, slctshipment, shpquantity, slctmnf_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)', [serial_id, slctshipment, shpquantity, slctmnf_id, created_at, created_at], (error, results, fields) => {
-	// 	if (error) {
-	// 	  return response.status(500).json({ error: 'Serial not found' });
-	// 	}
-	// 	if(results.length === 0){
-	// 		return response.status(500).json({ error: 'Serial not created in database' });
-	// 	}
-	// 	return response.json({ message: 'Response: Serial created successfully!'});
-	// });
+	const serial_id = request.body.matsid;
+	const slctshipment = request.body.slctshipment;
+	const shpquantity = request.body.shpquantity;
+	const slctmnf_id = request.body.slctmnf_id;
+	const created_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
+	pool.query('INSERT INTO material_serial (serial_id, slctshipment, shpquantity, slctmnf_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)', [serial_id, slctshipment, shpquantity, slctmnf_id, created_at, created_at], (error, results, fields) => {
+		if (error) {
+		  return response.status(500).json({ error: 'Serial not found' });
+		}
+		if(results.length === 0){
+			return response.status(500).json({ error: 'Serial not created in database' });
+		}
+		return response.json({ message: 'Response: Serial created successfully!'});
+	});
+});
+app.post('/add-serial-bulk', upload.none(),  (request, response) => {
+	const serial_id = request.body.serial_id;
+	const slctshipment = request.body.shipment_id;
+	const shpquantity = request.body.quantity;
+	const slctmnf_id = request.body.manufacturer_name;
+	const created_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
+	pool.query('SELECT mnfid FROM manufacture WHERE mnfname = ?', [slctmnf_id], (error, results, fields) => {
+		if (error) {
+		  return response.status(500).json({ error: 'Error querying the database' });
+		}
+	  
+		if (results.length === 0) {
+		  return response.status(500).json({ error: 'Manufacturer not found in the database' });
+		}
+	  
+		const slctmnf_id = results[0].mnfid;
+	  
+		// Now, you have the manufacturer_id, you can proceed with the INSERT operation
+		pool.query(
+		  'INSERT INTO material_serial (serial_id, slctshipment, shpquantity, slctmnf_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+		  [serial_id, slctshipment, shpquantity, slctmnf_id, created_at, created_at],
+		  (error, results, fields) => {
+			if (error) {
+			  return response.status(500).json({ error: 'Error inserting into the database' });
+			}
+	  
+			return response.json({ message: 'Response: Serial created successfully!' });
+		  }
+		);
+	  });
 });
 app.post('/add-warehouse', upload.none(),  (request, response) => {
 	const mnfid = request.body.mnfid;
