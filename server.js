@@ -14,7 +14,6 @@ const pool = mysql.createPool({
 	connectionLimit: 10,
 	queueLimit: 0
   });
-
 app.listen(5000, () => {
     console.log('Server running!');
 });
@@ -65,6 +64,69 @@ app.post('/make-category', upload.none(),  (request, response) => {
     // console.log('User logged in successfully', results);
     return response.json({ message: 'Response: Category created successfully!'});
   });
+});
+app.post('/update-category', upload.none(),  (request, response) => {
+	const categid = request.body.categid;
+	const newname = request.body.newname;
+	const updated_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
+  pool.query('UPDATE material_category SET name = ?, updated_at = ? WHERE id = ?', [newname, updated_at, categid], (error, results, fields) => {
+    if (error) {
+    //   console.error('Category not created:', error);
+      return response.status(500).json({ error: 'Category not found' });
+    }
+	if(results.length === 0){
+		// console.log('Admin not found in database', results);
+		return response.status(500).json({ error: 'Category not updated in database' });
+	}
+    // console.log('User logged in successfully', results);
+    return response.json({ message: 'Response: Category updated successfully!'});
+  });
+});
+app.post('/delete-category', upload.none(),  (request, response) => {
+	const categid = request.body.categid;
+  pool.query('DELETE FROM material_category WHERE id = ?', [categid], (error, results, fields) => {
+    if (error) {
+    //   console.error('Category not created:', error);
+      return response.status(500).json({ error: 'Category not Deleted' });
+    }
+    // console.log('User logged in successfully', results);
+    return response.json({ message: 'Response: Category deleted successfully!'});
+  });
+});
+app.get('/get-catsubcat', (request, response) => {
+    const selectQuery = 'SELECT * FROM material_category';
+    pool.query(selectQuery, (error, categories, fields) => {
+        if (error) {
+            return response.status(500).json({ error: 'Internal Server Error' });
+        }
+        const categoryData = categories.map(category => {
+            return new Promise((resolve, reject) => {
+                const subcategoryQuery = 'SELECT * FROM subcategory WHERE category_id = ?';
+                pool.query(subcategoryQuery, [category.id], (error, subcategories) => {
+                    if (error) {
+                        reject(error);
+                        return;
+                    }
+                    const categoryWithSubcategories = {
+                        category_id: category.id,
+                        category_name: category.name,
+                        subcategories: subcategories
+                    };
+                    
+                    resolve(categoryWithSubcategories);
+                });
+            });
+        });
+        
+        // Wait for all promises to resolve
+        Promise.all(categoryData)
+            .then(result => {
+                return response.json({ data: result });
+            })
+            .catch(error => {
+                return response.status(500).json({ error: 'Internal Server Error' });
+            });
+    });
 });
 app.get('/get-categories', (request, response) => {
     const selectQuery = 'SELECT * FROM material_category';
@@ -167,19 +229,46 @@ app.post('/add-material-bulk', upload.none(),  (request, response) => {
 	});
 });
 app.get('/get-material', (request, response) => {
-    const selectQuery = 'SELECT * FROM material';
-	pool.query(selectQuery, (error, results, fields) => {
-		if (error) {
-		//   console.error('Error selecting from MySQL:', error);
-		  return response.status(500).json({ error: 'Internal Server Error' });
-		}
-		// console.log('Data selected from MySQL:', results);
-		return response.json({ data: results });
-	});
+  pool.query(`SELECT 
+  material.id, 
+  material.component, 
+  material.model,
+  material.description, 
+  material.partno,
+  material.quantity,
+  material.activeButtonText,
+  material_types.name AS type,
+  material_category.name AS slctcateg,
+  subcategory.name AS slctsubcateg
+ FROM material 
+ JOIN material_types ON material.type = material_types.id 
+ JOIN material_category ON material.slctcateg = material_category.id 
+ JOIN subcategory ON material.slctsubcateg = subcategory.id`, (error, results, fields) => {
+    if (error) {
+      return response.status(500).json({ error: 'Material not found' });
+    }
+	if(results.length === 0){
+		return response.status(500).json({ error: 'Material not created in database' });
+	}
+	return response.json({ data: results });
+  });
+});
+app.post('/get-mattypesbysub', upload.none(),  (request, response) => {
+	const subid = request.body.subid;
+  pool.query(`SELECT type FROM material WHERE slctsubcateg = '${subid}'`, (error, results, fields) => {
+    if (error) {
+      return response.status(500).json({ error: 'Material not found' });
+    }
+	if(results.length === 0){
+		return response.status(500).json({ error: 'Material not created in database' });
+	}
+	return response.json({ data: results });
+  });
 });
 app.post('/get-materialbytype', upload.none(),  (request, response) => {
-	const matid = request.body.matid;
-  pool.query(`SELECT * FROM material WHERE type = '${matid}'`, (error, results, fields) => {
+	const typeid = request.body.typeid;
+	const subid = request.body.subid;
+  pool.query(`SELECT id, component FROM material WHERE type = '${typeid}' AND slctsubcateg = '${subid}'`, (error, results, fields) => {
     if (error) {
       return response.status(500).json({ error: 'Material not found' });
     }
@@ -214,8 +303,9 @@ app.post('/add-shipment', upload.none(),  (request, response) => {
 	const shipmentqty = request.body.shipmentqty;
 	const receivedqty = request.body.receivedqty;
 	const remainingqty = request.body.remainingqty;
+	const slctwrhs = request.body.slctwrhs;
 	const created_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
-  pool.query('INSERT INTO shipment (shipid, name, shpfrom, slctcateg, slctsubcateg, slctmat, slcttype, packingno, quantity, shipmentqty, receivedqty, remainingqty, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [shipid, name, from, slctcateg, slctsubcateg, slctmat, slcttype, packingno, quantity, shipmentqty, receivedqty, remainingqty, created_at, created_at], (error, results, fields) => {
+  pool.query('INSERT INTO shipment (shipid, name, shpfrom, slctwrhs, slctcateg, slctsubcateg, slctmat, slcttype, packingno, quantity, shipmentqty, receivedqty, remainingqty, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [shipid, name, from, slctwrhs, slctcateg, slctsubcateg, slctmat, slcttype, packingno, quantity, shipmentqty, receivedqty, remainingqty, created_at, created_at], (error, results, fields) => {
     if (error) {
       return response.status(500).json({ error: 'Shipment not found' });
     }
@@ -236,10 +326,44 @@ app.get('/get-shipments', (request, response) => {
 		return response.json({ data: results });
 	});
 });
+app.get('/get-allshipments', (request, response) => {
+	pool.query(`SELECT 
+	shipment.shipid,
+	shipment.name,
+	shipment.shpfrom,
+	warehouse.wrhidname AS warehousename,
+	material_category.name AS categoryname,
+	subcategory.name AS subcategoryname,
+	material.component AS materialname,
+	material_types.name AS typename,
+	shipment.packingno,
+	shipment.quantity,
+	shipment.shipmentqty,
+	shipment.receivedqty,
+	shipment.remainingqty
+   FROM shipment 
+   JOIN material_category ON shipment.slctcateg = material_category.id 
+   JOIN material ON shipment.slctmat = material.id 
+   JOIN warehouse ON shipment.slctwrhs = warehouse.id 
+   JOIN subcategory ON shipment.slctsubcateg = subcategory.id 
+   JOIN material_types ON shipment.slcttype = material_types.id`, (error, results, fields) => {
+		if (error) {
+		return response.status(500).json({ error: 'Shipment not found' });
+		}
+		if(results.length === 0){
+			return response.status(500).json({ error: 'Shipment not created in database' });
+		}
+		return response.json({ data: results });
+	});
+});
 app.post('/get-shipmentvalues', upload.none(),  (request, response) => {
 	const shpid = request.body.shpid;
   pool.query(`SELECT 
   shipment.packingno, 
+  shipment.slctcateg, 
+  shipment.slctsubcateg, 
+  shipment.slctmat, 
+  shipment.slcttype, 
   shipment.quantity, 
   shipment.receivedqty,
   shipment.remainingqty, 
@@ -248,13 +372,14 @@ app.post('/get-shipmentvalues', upload.none(),  (request, response) => {
   material.description AS materialdescription,
   material.activeButtonText AS materialunit,
   subcategory.name AS subcategoryname, 
-  material_types.name AS typename
+  material_types.name AS typename,
+  (SELECT COUNT(*) FROM serial_numbers WHERE shipid = '${shpid}') AS total_sn
  FROM shipment 
  JOIN material_category ON shipment.slctcateg = material_category.id 
  JOIN material ON shipment.slctmat = material.id 
  JOIN subcategory ON shipment.slctsubcateg = subcategory.id 
- JOIN material_types ON shipment.slcttype = material_types.id  
- WHERE shipment.id = '${shpid}'`, (error, results, fields) => {
+ JOIN material_types ON shipment.slcttype = material_types.id   
+ WHERE shipment.shipid = '${shpid}'`, (error, results, fields) => {
     if (error) {
       return response.status(500).json({ error: 'Shipment not found' });
     }
@@ -336,6 +461,7 @@ app.post('/add-serial-bulk', upload.none(),  (request, response) => {
 		  }
 		);
 	  });
+
 });
 app.post('/add-warehouse', upload.none(),  (request, response) => {
 	const mnfid = request.body.mnfid;
@@ -376,6 +502,18 @@ app.post('/add-site', upload.none(),  (request, response) => {
 			return response.status(500).json({ error: 'Site not created in database' });
 		}
 		return response.json({ message: 'Response: Site created successfully!'});
+	});
+});
+app.post('/get-siteaddressbyId', upload.none(),  (request, response) => {
+	const siteid = request.body.siteid;
+	pool.query(`SELECT sitelocation FROM site WHERE id = '${siteid}'`, (error, results, fields) => {
+		if (error) {
+		  return response.status(500).json({ error: 'Site not found' });
+		}
+		if(results.length === 0){
+			return response.status(500).json({ error: 'Site not found in database' });
+		}
+		return response.json({ data: results });
 	});
 });
 app.get('/get-site', (request, response) => {
@@ -482,5 +620,185 @@ app.post('/update-role', upload.none(),  (request, response) => {
 			return response.status(500).json({ error: 'Role not updated in database' });
 		}
 		return response.json({ message: 'Response: Role updated successfully!'});
+	});
+});
+app.post('/add-role', upload.none(),  (request, response) => {
+	const username = request.body.username;
+	const add_material = request.body.add_material;
+	const mcategory = request.body.mcategory;
+	const msn = request.body.msn;
+	const manufacture = request.body.manufacture;
+	const shipment = request.body.shipment;
+	const warehouse = request.body.warehouse;
+	const site = request.body.site;
+	const company = request.body.company;
+	const sitereq = request.body.sitereq;
+	const createreq = request.body.createreq;
+	const requpdate = request.body.requpdate;
+	const userinfo = request.body.userinfo;
+	const rolecontrol = request.body.rolecontrol;
+	const created_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
+	pool.query('INSERT INTO user_role (username, add_material, mcategory, msn, manufacture, shipment, warehouse, site, company, sitereq, createreq, requpdate, userinfo, rolecontrol, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [username, add_material, mcategory, msn, manufacture, shipment, warehouse, site, company, sitereq, createreq, requpdate, userinfo, rolecontrol, created_at, created_at],(error, results, fields) => {
+		if (error) {
+		  return response.status(500).json({ error: 'Role not found' });
+		}
+		if(results.length === 0){
+			return response.status(500).json({ error: 'Role not created in database' });
+		}
+		return response.json({ message: 'Response: Role created successfully!'});
+	});
+});
+app.post('/add-sn', upload.none(),  (request, response) => {
+	const shpsnmnly = request.body.shpsnmnly;
+	const slctshipment = request.body.slctshipment;
+	const created_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
+	pool.query('INSERT INTO serial_numbers (serial, shipid, created_at, updated_at) VALUES (?, ?, ?, ?)', [shpsnmnly, slctshipment, created_at, created_at], (error, results, fields) => {
+		if (error) {
+		  return response.status(500).json({ error: 'Serial Number not found' });
+		}
+		if(results.length === 0){
+			return response.status(500).json({ error: 'Serial Number not updated in database' });
+		}
+		return response.json({ message: 'Response: Serial Number updated successfully!'});
+	});
+});
+app.post('/get-sn', upload.none(),  (request, response) => {
+    const shipId = request.body.slctshipment; // Correct the variable name to match the one used in the query
+    pool.query('SELECT * FROM serial_numbers WHERE shipid = ?', [shipId], (error, results, fields) => {
+        if (error) {
+            return response.status(500).json({ error: 'Internal Server Error' });
+        }
+        if (results.length === 0) {
+            return response.status(404).json({ error: 'Serial Number not found in database' });
+        }
+        return response.json({ message: 'Response: Serial Number found successfully!', data: results });
+    });
+});
+app.get('/get-allsn', upload.none(),  (request, response) => {
+    pool.query('SELECT * FROM serial_numbers', (error, results, fields) => {
+        if (error) {
+            return response.status(500).json({ error: 'Internal Server Error' });
+        }
+        if (results.length === 0) {
+            return response.status(404).json({ error: 'Serial Number not found in database' });
+        }
+        return response.json({ message: 'Response: Serial Number found successfully!', data: results });
+    });
+});
+app.post('/request-requisition', upload.none(),  (request, response) => {
+	const rmnm = request.body.rmnm;
+	const mruser = request.body.mruser;
+	const slctsite = request.body.slctsite;
+	const outdate = request.body.outdate;
+	const ppperson = request.body.ppperson;
+	const ppnumber = request.body.ppnumber;
+	const slctcomp = request.body.slctcomp;
+	const trpmode = request.body.trpmode;
+	const trpnumber = request.body.trpnumber;
+	const created_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
+	pool.query('INSERT INTO requistion_request (rm_number, created_by, siteid, outbound, ppperson, ppnumber, companyid, trsmode, trsnumber,  created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [rmnm, mruser, slctsite, outdate, ppperson, ppnumber, slctcomp, trpmode, trpnumber, created_at, created_at], (error, results, fields) => {
+		if (error) {
+			// console.error('Error executing SQL query:', error);
+		  return response.status(500).json({ error: 'Requisition not found' });
+		}
+		if(results.length === 0){
+			return response.status(500).json({ error: 'Requisition not created in database' });
+		}
+		return response.json({ message: 'Response: Requisition created successfully!'});
+	});
+});
+app.post('/get-shipmentvaluesbyWH', upload.none(),  (request, response) => {
+    const shpid = request.body.shpid; // Correct the variable name to match the one used in the query
+    pool.query(`SELECT 
+	shipment.packingno, 
+	shipment.slctcateg, 
+	shipment.slctsubcateg, 
+	shipment.slctmat, 
+	shipment.slcttype, 
+	shipment.quantity, 
+	shipment.receivedqty,
+	shipment.remainingqty, 
+	material_category.name AS categoryname,
+	material.component AS materialname,
+	material.description AS materialdescription,
+	material.activeButtonText AS materialunit,
+	subcategory.name AS subcategoryname, 
+	material_types.name AS typename,
+	(SELECT COUNT(*) FROM serial_numbers WHERE shipid = '${shpid}') AS total_sn
+   FROM shipment 
+   JOIN material_category ON shipment.slctcateg = material_category.id 
+   JOIN material ON shipment.slctmat = material.id 
+   JOIN subcategory ON shipment.slctsubcateg = subcategory.id 
+   JOIN material_types ON shipment.slcttype = material_types.id   
+   WHERE shipment.slctwrhs = '${shpid}'`, (error, results, fields) => {
+        if (error) {
+            return response.status(500).json({ error: 'Internal Server Error' });
+        }
+        if (results.length === 0) {
+            return response.status(404).json({ error: 'Shipment not found in database' });
+        }
+        return response.json({ message: 'Response: Shipment found successfully!', data: results });
+    });
+});
+app.post('/add-requisitionlisiting', upload.none(),  (request, response) => {
+	const slctwrhs = request.body.slctwrhs;
+	const packingno = request.body.packingno;
+	const shpcat = request.body.shpcat;
+	const slctshpsubcat = request.body.slctshpsubcat;
+	const shptype = request.body.shptype;
+	const shpmatname = request.body.shpmatname;
+	const shppurchase = request.body.shppurchase;
+	const shpreceived = request.body.shpreceived;
+	const shpremaining = request.body.shpremaining;
+	const shounit = request.body.shounit;
+	const shpupdatedqty = request.body.shpupdatedqty;
+	const shpremainingqty = request.body.shpremainingqty;
+	const created_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
+	pool.query('INSERT INTO requisition_lisiting (whid, packingno, categid, subcategid, typeid, matid, quantity, receivedqty, remainingqty, unit, addqty, rmqty, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [slctwrhs, packingno, shpcat, slctshpsubcat, shptype, shpmatname, shppurchase, shpreceived, shpremaining, shounit, shpupdatedqty, shpremainingqty, created_at, created_at], (error, results, fields) => {
+		if (error) {
+			// console.error('Error executing SQL query:', error);
+		  return response.status(500).json({ error: 'Requisition not found' });
+		}
+		if(results.length === 0){
+			return response.status(500).json({ error: 'Requisition Listing not created in database' });
+		}
+		return response.json({ message: 'Response: Requisition Listing created successfully!'});
+	});
+});
+app.get('/get-allreqlisiting', (request, response) => {
+	pool.query(`SELECT 
+	requisition_lisiting.id,
+	requisition_lisiting.packingno,
+	requisition_lisiting.addsl,
+	requisition_lisiting.unit,
+	material.component AS materialname,
+	material_types.name AS typename,
+	material.description AS materialdesc,
+	requisition_lisiting.quantity
+   FROM requisition_lisiting 
+   JOIN material ON requisition_lisiting.matid = material.id 
+   JOIN material_types ON requisition_lisiting.typeid = material_types.id`, (error, results, fields) => {
+		if (error) {
+		return response.status(500).json({ error: 'Requisition not found' });
+		}
+		if(results.length === 0){
+			return response.status(500).json({ error: 'Requisition not created in database' });
+		}
+		return response.json({ data: results });
+	});
+});
+app.post('/update-lisitingsn', upload.none(),  (request, response) => {
+	const lsid = request.body.lsid;
+	const selectedCheckboxes = request.body.selectedCheckboxes;
+	const stringWithSpaces = selectedCheckboxes.replace(/,/g, ' ');
+	const updated_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
+	pool.query('UPDATE requisition_lisiting SET addsl = ?, updated_at = ? WHERE id = ?', [stringWithSpaces, updated_at, lsid], (error, results, fields) => {
+		if (error) {
+		  return response.status(500).json({ error: 'Requisition not found' });
+		}
+		if(results.length === 0){
+			return response.status(500).json({ error: 'Requisition not updated in database' });
+		}
+		return response.json({ message: 'Response: Requisition updated successfully!'});
 	});
 });
