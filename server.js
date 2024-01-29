@@ -24,7 +24,7 @@ app.post('/login', upload.none(),  (request, response) => {
 	// console.log('Received request:', request.body);
 	const email = request.body.email;
 	const password = request.body.password;
-  pool.query(`SELECT * FROM admin WHERE email = '${email}' AND password = '${password}'`, (error, results, fields) => {
+  pool.query(`SELECT * FROM users WHERE email = '${email}' AND password = '${password}'`, (error, results, fields) => {
     if (error) {
     //   console.error('Admin not found:', error);
       return response.status(500).json({ error: 'Admin not found' });
@@ -741,6 +741,7 @@ app.post('/get-shipmentvaluesbyWH', upload.none(),  (request, response) => {
     });
 });
 app.post('/add-requisitionlisiting', upload.none(),  (request, response) => {
+	const rmnm = request.body.rmnm;
 	const slctwrhs = request.body.slctwrhs;
 	const packingno = request.body.packingno;
 	const shpcat = request.body.shpcat;
@@ -754,18 +755,32 @@ app.post('/add-requisitionlisiting', upload.none(),  (request, response) => {
 	const shpupdatedqty = request.body.shpupdatedqty;
 	const shpremainingqty = request.body.shpremainingqty;
 	const created_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
-	pool.query('INSERT INTO requisition_lisiting (whid, packingno, categid, subcategid, typeid, matid, quantity, receivedqty, remainingqty, unit, addqty, rmqty, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [slctwrhs, packingno, shpcat, slctshpsubcat, shptype, shpmatname, shppurchase, shpreceived, shpremaining, shounit, shpupdatedqty, shpremainingqty, created_at, created_at], (error, results, fields) => {
+	pool.query('INSERT INTO requisition_lisiting (rmnm, whid, packingno, categid, subcategid, typeid, matid, quantity, receivedqty, remainingqty, unit, addqty, rmqty, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [rmnm, slctwrhs, packingno, shpcat, slctshpsubcat, shptype, shpmatname, shppurchase, shpreceived, shpremaining, shounit, shpupdatedqty, shpremainingqty, created_at, created_at], (error, results, fields) => {
 		if (error) {
 			// console.error('Error executing SQL query:', error);
 		  return response.status(500).json({ error: 'Requisition not found' });
 		}
-		if(results.length === 0){
-			return response.status(500).json({ error: 'Requisition Listing not created in database' });
-		}
-		return response.json({ message: 'Response: Requisition Listing created successfully!'});
+		// if(results.length === 0){
+		// 	return response.status(500).json({ error: 'Requisition Listing not created in database' });
+		// }
+		// return response.json({ message: 'Response: Requisition Listing created successfully!', data: results});
+		pool.query('SELECT * FROM requisition_lisiting WHERE id = ?', results.insertId, (selectError, selectResults, selectFields) => {
+            if (selectError) {
+                return response.status(500).json({ error: 'Error fetching inserted row' });
+            }
+
+            // Check if any rows were returned
+            if (selectResults.length === 0) {
+                return response.status(500).json({ error: 'Inserted row not found' });
+            }
+
+            // Return the inserted row's data
+            return response.json({ message: 'Response: Requisition Listing created successfully!', data: selectResults[0] });
+        });
 	});
 });
-app.get('/get-allreqlisiting', (request, response) => {
+app.post('/get-reqbyId', upload.none(),  (request, response) => {
+	const shpid = request.body.shpid;
 	pool.query(`SELECT 
 	requisition_lisiting.id,
 	requisition_lisiting.packingno,
@@ -777,12 +792,37 @@ app.get('/get-allreqlisiting', (request, response) => {
 	requisition_lisiting.quantity
    FROM requisition_lisiting 
    JOIN material ON requisition_lisiting.matid = material.id 
-   JOIN material_types ON requisition_lisiting.typeid = material_types.id`, (error, results, fields) => {
+   JOIN material_types ON requisition_lisiting.typeid = material_types.id
+   WHERE requisition_lisiting.id = '${shpid}'`, (error, results, fields) => {
 		if (error) {
 		return response.status(500).json({ error: 'Requisition not found' });
 		}
 		if(results.length === 0){
-			return response.status(500).json({ error: 'Requisition not created in database' });
+			return response.status(500).json({ error: 'Requisition not found in database' });
+		}
+		return response.json({ data: results });
+	});
+});
+app.post('/get-reqbyRNMN', upload.none(),  (request, response) => {
+	const shpid = request.body.shpid;
+	pool.query(`SELECT 
+	requisition_lisiting.id,
+	requisition_lisiting.packingno,
+	requisition_lisiting.addsl,
+	requisition_lisiting.unit,
+	material.component AS materialname,
+	material_types.name AS typename,
+	material.description AS materialdesc,
+	requisition_lisiting.quantity
+   FROM requisition_lisiting 
+   JOIN material ON requisition_lisiting.matid = material.id 
+   JOIN material_types ON requisition_lisiting.typeid = material_types.id
+   WHERE requisition_lisiting.rmnm = '${shpid}'`, (error, results, fields) => {
+		if (error) {
+		return response.status(500).json({ error: 'Requisition not found' });
+		}
+		if(results.length === 0){
+			return response.status(500).json({ error: 'Requisition not found in database' });
 		}
 		return response.json({ data: results });
 	});
@@ -796,9 +836,282 @@ app.post('/update-lisitingsn', upload.none(),  (request, response) => {
 		if (error) {
 		  return response.status(500).json({ error: 'Requisition not found' });
 		}
-		if(results.length === 0){
-			return response.status(500).json({ error: 'Requisition not updated in database' });
+		// if(results.length === 0){
+		// 	return response.status(500).json({ error: 'Requisition not updated in database' });
+		// }
+		// return response.json({ message: 'Response: Requisition updated successfully!'});
+		pool.query('SELECT * FROM requisition_lisiting WHERE id = ?', [lsid], (selectError, selectResults, selectFields) => {
+            if (selectError) {
+                return response.status(500).json({ error: 'Error fetching inserted row' });
+            }
+            if (selectResults.length === 0) {
+                return response.status(500).json({ error: 'Inserted row not found' });
+            }
+            return response.json({ message: 'Response: Requisition Listing updated successfully!', data: selectResults[0] });
+        });
+	});
+});
+app.post('/check-usercontrol', upload.none(),  (request, response) => {
+    const rmnm = request.body.rmnm; // Correct the variable name to match the one used in the query
+    pool.query('SELECT * FROM user_requisition WHERE rmnm = ?', [rmnm], (error, results, fields) => {
+        if (error) {
+            return response.status(500).json({ error: 'Internal Server Error' });
+        }
+        if (results.length === 0) {
+            return response.status(404).json({ error: 'User not found in database' });
+        }
+        return response.json({ data: results });
+    });
+});
+app.post('/add-userreq', upload.none(),  (request, response) => {
+	const rmnm = request.body.rmnm;
+	const created_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
+	pool.query('INSERT INTO user_requisition (rmnm, created_at, updated_at) VALUES (?, ?, ?)', [rmnm, created_at, created_at], (error, results, fields) => {
+		if (error) {
+			// console.error('Error executing SQL query:', error);
+		  return response.status(500).json({ error: 'Requisition not found' });
 		}
-		return response.json({ message: 'Response: Requisition updated successfully!'});
+		if(results.length === 0){
+			return response.status(500).json({ error: 'User Requisition not created in database' });
+		}
+		return response.json({ message: 'Response: User Requisition created successfully!'});
+	});
+});
+app.post('/update-userreq', upload.none(),  (request, response) => {
+	const email = request.body.email;
+	const rmnm = request.body.rmnm;
+	const updated_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
+	pool.query(`SELECT fullname, mobile, email FROM users Where email = ?`, [email], (error, results, fields) => {
+		if (error) {
+			// console.error('Error executing SQL query:', error);
+		  return response.status(500).json({ error: 'Requisition not found' });
+		}
+		if(results.length === 0){
+			return response.status(500).json({ error: 'User Requisition not created in database' });
+		}
+		const fullname = results[0].fullname;
+		const address = results[0].mobile;
+		const email = results[0].email;
+		const concatenatedString = fullname + ', ' + email + ', ' + address;
+		pool.query('UPDATE user_requisition SET mrcreatedby = ?, updated_at = ? WHERE rmnm = ?', [concatenatedString, updated_at, rmnm], (updateError, updateResults, updateFields) => {
+            if (updateError) {
+                return response.status(500).json({ error: 'Error updating user requisition' });
+            }
+            return response.json({ message: 'Response: User Requisition updated successfully!', user: results[0] });
+        });
+		// return response.json({ message: 'Response: User Requisition created successfully!'});
+	});
+});
+app.post('/update-SNuserreq', upload.none(),  (request, response) => {
+	const email = request.body.email;
+	const rmnm = request.body.rmnm;
+	const updated_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
+	pool.query(`SELECT fullname, mobile, email FROM users Where email = ?`, [email], (error, results, fields) => {
+		if (error) {
+			// console.error('Error executing SQL query:', error);
+		  return response.status(500).json({ error: 'Requisition not found' });
+		}
+		if(results.length === 0){
+			return response.status(500).json({ error: 'User Requisition not created in database' });
+		}
+		const fullname = results[0].fullname;
+		const address = results[0].mobile;
+		const email = results[0].email;
+		const concatenatedString = fullname + ', ' + email + ', ' + address;
+		pool.query('UPDATE user_requisition SET sncreatedby	 = ?, updated_at = ? WHERE rmnm = ?', [concatenatedString, updated_at, rmnm], (updateError, updateResults, updateFields) => {
+            if (updateError) {
+                return response.status(500).json({ error: 'Error updating user requisition' });
+            }
+            return response.json({ message: 'Response: User Requisition updated successfully!', user: results[0] });
+        });
+		// return response.json({ message: 'Response: User Requisition created successfully!'});
+	});
+});
+app.post('/update-Chuserreq', upload.none(),  (request, response) => {
+	const email = request.body.email;
+	const rmnm = request.body.rmnm;
+	const updated_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
+	pool.query(`SELECT fullname, mobile, email FROM users Where email = ?`, [email], (error, results, fields) => {
+		if (error) {
+			// console.error('Error executing SQL query:', error);
+		  return response.status(500).json({ error: 'Requisition not found' });
+		}
+		if(results.length === 0){
+			return response.status(500).json({ error: 'User Requisition not created in database' });
+		}
+		const fullname = results[0].fullname;
+		const address = results[0].mobile;
+		const email = results[0].email;
+		const concatenatedString = fullname + ', ' + email + ', ' + address;
+		pool.query('UPDATE user_requisition SET checkedby	 = ?, updated_at = ? WHERE rmnm = ?', [concatenatedString, updated_at, rmnm], (updateError, updateResults, updateFields) => {
+            if (updateError) {
+                return response.status(500).json({ error: 'Error updating user requisition' });
+            }
+            return response.json({ message: 'Response: User Requisition updated successfully!', user: results[0] });
+        });
+		// return response.json({ message: 'Response: User Requisition created successfully!'});
+	});
+});
+app.post('/update-Accuserreq', upload.none(),  (request, response) => {
+	const email = request.body.email;
+	const rmnm = request.body.rmnm;
+	const updated_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
+	pool.query(`SELECT fullname, mobile, email FROM users Where email = ?`, [email], (error, results, fields) => {
+		if (error) {
+			// console.error('Error executing SQL query:', error);
+		  return response.status(500).json({ error: 'Requisition not found' });
+		}
+		if(results.length === 0){
+			return response.status(500).json({ error: 'User Requisition not created in database' });
+		}
+		const fullname = results[0].fullname;
+		const address = results[0].mobile;
+		const email = results[0].email;
+		const concatenatedString = fullname + ', ' + email + ', ' + address;
+		pool.query('UPDATE user_requisition SET acceptedby	 = ?, updated_at = ? WHERE rmnm = ?', [concatenatedString, updated_at, rmnm], (updateError, updateResults, updateFields) => {
+            if (updateError) {
+                return response.status(500).json({ error: 'Error updating user requisition' });
+            }
+            return response.json({ message: 'Response: User Requisition updated successfully!', user: results[0] });
+        });
+		// return response.json({ message: 'Response: User Requisition created successfully!'});
+	});
+});
+app.post('/update-Rvwuserreq', upload.none(),  (request, response) => {
+	const email = request.body.email;
+	const rmnm = request.body.rmnm;
+	const updated_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
+	pool.query(`SELECT fullname, mobile, email FROM users Where email = ?`, [email], (error, results, fields) => {
+		if (error) {
+			// console.error('Error executing SQL query:', error);
+		  return response.status(500).json({ error: 'Requisition not found' });
+		}
+		if(results.length === 0){
+			return response.status(500).json({ error: 'User Requisition not created in database' });
+		}
+		const fullname = results[0].fullname;
+		const address = results[0].mobile;
+		const email = results[0].email;
+		const concatenatedString = fullname + ', ' + email + ', ' + address;
+		pool.query('UPDATE user_requisition SET reviewby	 = ?, updated_at = ? WHERE rmnm = ?', [concatenatedString, updated_at, rmnm], (updateError, updateResults, updateFields) => {
+            if (updateError) {
+                return response.status(500).json({ error: 'Error updating user requisition' });
+            }
+            return response.json({ message: 'Response: User Requisition updated successfully!', user: results[0] });
+        });
+		// return response.json({ message: 'Response: User Requisition created successfully!'});
+	});
+});
+app.post('/update-Appruserreq', upload.none(),  (request, response) => {
+	const email = request.body.email;
+	const rmnm = request.body.rmnm;
+	const updated_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
+	pool.query(`SELECT fullname, mobile, email FROM users Where email = ?`, [email], (error, results, fields) => {
+		if (error) {
+			// console.error('Error executing SQL query:', error);
+		  return response.status(500).json({ error: 'Requisition not found' });
+		}
+		if(results.length === 0){
+			return response.status(500).json({ error: 'User Requisition not created in database' });
+		}
+		const fullname = results[0].fullname;
+		const address = results[0].mobile;
+		const email = results[0].email;
+		const concatenatedString = fullname + ', ' + email + ', ' + address;
+		pool.query('UPDATE user_requisition SET approvedby	 = ?, updated_at = ? WHERE rmnm = ?', [concatenatedString, updated_at, rmnm], (updateError, updateResults, updateFields) => {
+            if (updateError) {
+                return response.status(500).json({ error: 'Error updating user requisition' });
+            }
+            return response.json({ message: 'Response: User Requisition updated successfully!', user: results[0] });
+        });
+		// return response.json({ message: 'Response: User Requisition created successfully!'});
+	});
+});
+app.get('/get-allreqs', upload.none(), (request, response) => {
+    pool.query(`SELECT 
+                    rr.id,
+                    rr.rm_number,
+                    rr.created_by,
+                    rr.outbound,
+                    rr.created_at,
+                    site.sitename AS sitename,
+                    company.compname AS compname,
+                    ur.mrcreatedby,
+                    ur.sncreatedby,
+                    ur.checkedby,
+                    ur.acceptedby,
+                    ur.reviewby,
+                    ur.approvedby,
+                    ur.rejected_by
+                FROM requistion_request AS rr
+                JOIN company ON rr.companyid = company.id 
+                JOIN site ON rr.siteid = site.id
+                LEFT JOIN user_requisition AS ur ON rr.rm_number = ur.rmnm`, (error, results, fields) => {
+        if (error) {
+            return response.status(500).json({ error: 'Internal Server Error' });
+        }
+        if (results.length === 0) {
+            return response.status(404).json({ error: 'Requistion requests not found in database' });
+        }
+
+        // Iterate over the results to determine the status for each row
+        const formattedResults = results.map(row => {
+			if (row.rejected_by !== null) {
+                row.status = 'Rejected By User';
+            } else if (row.approvedby !== null) {
+                row.status = 'Awaiting Delivery';
+            } else if (row.reviewby !== null) {
+                row.status = 'Awaiting for Approval';
+            } else if (row.acceptedby !== null) {
+                row.status = 'Review Not Done';
+            } else if (row.checkedby !== null) {
+                row.status = 'MR Not Accepted';
+            } else if (row.sncreatedby !== null) {
+                row.status = 'Awaiting for checking';
+            } else if (row.mrcreatedby !== null) {
+                row.status = 'S/N not added';
+            } else {
+                row.status = 'Unknown status';
+            }
+            return row;
+        });
+
+        return response.json({ message: 'Response: Requistion requests found successfully!', data: formattedResults });
+    });
+});
+app.post('/check-userauth', upload.none(),  (request, response) => {
+    const email = request.body.email; // Correct the variable name to match the one used in the query
+    pool.query(`SELECT username FROM users Where email = ?`, [email], (error, results, fields) => {
+		if (error) {
+			// console.error('Error executing SQL query:', error);
+		  return response.status(500).json({ error: 'Requisition not found' });
+		}
+		if(results.length === 0){
+			return response.status(500).json({ error: 'User Requisition not created in database' });
+		}
+		const username = results[0].username;
+		pool.query('SELECT * FROM user_role WHERE username = ?', [username], (updateError, updateResults, updateFields) => {
+            if (updateError) {
+                return response.status(500).json({ error: 'Error updating user requisition' });
+            }
+            return response.json({ message: 'Response: User Requisition updated successfully!', data: updateResults[0] });
+        });
+		// return response.json({ message: 'Response: User Requisition created successfully!'});
+	});
+});
+app.post('/reject-req', upload.none(),  (request, response) => {
+	const email = request.body.email;
+	const rmnm = request.body.rmnm;
+	const rejectnote = request.body.rejectnote;
+	const updated_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
+	pool.query('UPDATE user_requisition SET reject_note	 = ?, rejected_by	 = ?, updated_at = ? WHERE rmnm = ?', [rejectnote, email, updated_at, rmnm], (error, results, fields) => {
+		if (error) {
+			// console.error('Error executing SQL query:', error);
+		  return response.status(500).json({ error: 'Requisition not found' });
+		}
+		if(results.length === 0){
+			return response.status(500).json({ error: 'User Requisition not created in database' });
+		}
+		return response.json({ message: 'Response: User Requisition updated successfully!' });
 	});
 });
