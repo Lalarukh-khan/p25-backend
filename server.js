@@ -1115,3 +1115,59 @@ app.post('/reject-req', upload.none(),  (request, response) => {
 		return response.json({ message: 'Response: User Requisition updated successfully!' });
 	});
 });
+app.get('/req-dashboard', (request, response) => {
+    // Query to count total number of rows
+    pool.query(`SELECT COUNT(*) AS totalRows FROM user_requisition`, (error, results, fields) => {
+        if (error) {
+            return response.status(500).json({ error: 'Internal Server Error' });
+        }
+
+        // Extract the total number of rows from the results
+        const totalRows = results[0].totalRows;
+
+        // Query to count number of rows where approved_by is not null
+        pool.query(`SELECT COUNT(*) AS approvedRows FROM user_requisition WHERE approvedby IS NOT NULL`, (approvedError, approvedResults, approvedFields) => {
+            if (approvedError) {
+                return response.status(500).json({ error: 'Internal Server Error' });
+            }
+
+            // Extract the count of rows where approved_by is not null
+            const approvedRows = approvedResults[0].approvedRows;
+
+            // Query to count number of rows where approved_by is null
+            pool.query(`SELECT COUNT(*) AS notApprovedRows FROM user_requisition WHERE approvedby IS NULL`, (notApprovedError, notApprovedResults, notApprovedFields) => {
+                if (notApprovedError) {
+                    return response.status(500).json({ error: 'Internal Server Error' });
+                }
+
+                // Extract the count of rows where approved_by is null
+                const notApprovedRows = notApprovedResults[0].notApprovedRows;
+				pool.query(`SELECT COUNT(*) AS completed FROM user_requisition WHERE completed IS NOT NULL`, (CompletedError, CompletedResults, CompletedFields) => {
+					if (CompletedError) {
+						return response.status(500).json({ error: 'Internal Server Error' });
+					}
+					const completedRows = CompletedResults[0].completed;
+					pool.query(`SELECT COUNT(*) AS attach_file FROM user_requisition WHERE attach_file IS NOT NULL`, (AttachFileError, AttachfileResults, AttachFields) => {
+						if (AttachFileError) {
+							return response.status(500).json({ error: 'Internal Server Error' });
+						}
+						const attachRows = AttachfileResults[0].attach_file;
+		
+						pool.query(`SELECT COUNT(*) AS install_status FROM user_requisition WHERE install_status IS NOT NULL`, (InstallError, InstallResults, AttachFields) => {
+							if (InstallError) {
+								return response.status(500).json({ error: 'Internal Server Error' });
+							}
+							const installRows = InstallResults[0].install_status;
+			
+							// Return the total number of rows and counts of approved and not approved rows in the response
+							return response.json({ totalRows: totalRows, approvedRows: approvedRows, notApprovedRows: notApprovedRows, completedRows: completedRows, attachRows: attachRows, installRows: installRows });
+						});
+					});
+				});
+                // Return the total number of rows and counts of approved and not approved rows in the response
+                // return response.json({ totalRows: totalRows, approvedRows: approvedRows, notApprovedRows: notApprovedRows });
+            });
+        });
+    });
+});
+
