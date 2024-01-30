@@ -1057,19 +1057,19 @@ app.get('/get-allreqs', upload.none(), (request, response) => {
         // Iterate over the results to determine the status for each row
         const formattedResults = results.map(row => {
 			if (row.rejected_by !== null) {
-                row.status = 'Rejected By User';
+                row.status = `Rejected By ${row.rejected_by}`;
             } else if (row.approvedby !== null) {
-                row.status = 'Awaiting Delivery';
+                row.status = 'Awaiting For Delivery';
             } else if (row.reviewby !== null) {
-                row.status = 'Awaiting for Approval';
+                row.status = 'Waiting for Approval';
             } else if (row.acceptedby !== null) {
-                row.status = 'Review Not Done';
+                row.status = 'Waiting For Review';
             } else if (row.checkedby !== null) {
-                row.status = 'MR Not Accepted';
+                row.status = 'Waiting for Accepted';
             } else if (row.sncreatedby !== null) {
                 row.status = 'Awaiting for checking';
             } else if (row.mrcreatedby !== null) {
-                row.status = 'S/N not added';
+                row.status = 'Waiting For S/N';
             } else {
                 row.status = 'Unknown status';
             }
