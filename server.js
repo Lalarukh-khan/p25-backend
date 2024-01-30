@@ -789,7 +789,7 @@ app.post('/get-reqbyId', upload.none(),  (request, response) => {
 	material.component AS materialname,
 	material_types.name AS typename,
 	material.description AS materialdesc,
-	requisition_lisiting.quantity
+	requisition_lisiting.addqty
    FROM requisition_lisiting 
    JOIN material ON requisition_lisiting.matid = material.id 
    JOIN material_types ON requisition_lisiting.typeid = material_types.id
@@ -813,12 +813,24 @@ app.post('/get-reqbyRNMN', upload.none(),  (request, response) => {
 	material.component AS materialname,
 	material_types.name AS typename,
 	material.description AS materialdesc,
-	requisition_lisiting.quantity
+	requisition_lisiting.addqty,
+	requistion_request.outbound,
+	requistion_request.ppperson,
+	requistion_request.ppnumber,
+	requistion_request.trsmode,
+	requistion_request.trsnumber,
+	site.sitename,
+	site.sitelocation,
+	company.compname
    FROM requisition_lisiting 
    JOIN material ON requisition_lisiting.matid = material.id 
+   JOIN requistion_request ON requisition_lisiting.rmnm = requistion_request.rm_number 
    JOIN material_types ON requisition_lisiting.typeid = material_types.id
+   JOIN site ON requistion_request.siteid = site.id
+   JOIN company ON requistion_request.companyid = company.id
    WHERE requisition_lisiting.rmnm = '${shpid}'`, (error, results, fields) => {
 		if (error) {
+			console.log(error);
 		return response.status(500).json({ error: 'Requisition not found' });
 		}
 		if(results.length === 0){
