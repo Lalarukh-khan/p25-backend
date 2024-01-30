@@ -1170,9 +1170,35 @@ app.get('/req-dashboard', (request, response) => {
         });
     });
 });
-app.post('/getquantities', upload.none(),  (request, response) => {
+app.post('/getpuchaseqty', upload.none(),  (request, response) => {
 	const selectedValue = request.body.selectedValue;
-	pool.query('SELECT quantity, receivedqty, addqty FROM requisition_lisiting WHERE subcategid = ?', [selectedValue], (error, results, fields) => {
+	pool.query('SELECT quantity FROM material WHERE slctsubcateg = ?', [selectedValue], (error, results, fields) => {
+		if (error) {
+			// console.error('Error executing SQL query:', error);
+		  return response.status(500).json({ error: 'Requisition not found' });
+		}
+		if(results.length === 0){
+			return response.status(500).json({ error: 'User Requisition not created in database' });
+		}
+		return response.json({ data: results});
+	});
+});
+app.post('/getwarehouseqty', upload.none(),  (request, response) => {
+	const selectedValue = request.body.selectedValue;
+	pool.query('SELECT receivedqty FROM shipment WHERE slctsubcateg = ?', [selectedValue], (error, results, fields) => {
+		if (error) {
+			// console.error('Error executing SQL query:', error);
+		  return response.status(500).json({ error: 'Requisition not found' });
+		}
+		if(results.length === 0){
+			return response.status(500).json({ error: 'User Requisition not created in database' });
+		}
+		return response.json({ data: results});
+	});
+});
+app.post('/getsiteqty', upload.none(),  (request, response) => {
+	const selectedValue = request.body.selectedValue;
+	pool.query('SELECT addqty FROM requisition_lisiting WHERE subcategid = ?', [selectedValue], (error, results, fields) => {
 		if (error) {
 			// console.error('Error executing SQL query:', error);
 		  return response.status(500).json({ error: 'Requisition not found' });
