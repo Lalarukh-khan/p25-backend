@@ -652,7 +652,7 @@ app.post('/add-sn', upload.none(),  (request, response) => {
 	const shpsnmnly = request.body.shpsnmnly;
 	const slctshipment = request.body.slctshipment;
 	const created_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
-	pool.query('INSERT INTO serial_numbers (serial, shipid, created_at, updated_at) VALUES (?, ?, ?, ?)', [shpsnmnly, slctshipment, created_at, created_at], (error, results, fields) => {
+	pool.query('INSERT INTO serial_numbers (serial, matid, created_at, updated_at) VALUES (?, ?, ?, ?)', [shpsnmnly, slctshipment, created_at, created_at], (error, results, fields) => {
 		if (error) {
 		  return response.status(500).json({ error: 'Serial Number not found' });
 		}
@@ -662,9 +662,39 @@ app.post('/add-sn', upload.none(),  (request, response) => {
 		return response.json({ message: 'Response: Serial Number updated successfully!'});
 	});
 });
+app.post('/add-sn-bulk', upload.none(),  (request, response) => {
+	const shpsnmnly = request.body.shpsnmnly;
+	const slctshipment = request.body.slctshipment;
+	const created_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
+	pool.query('SELECT id FROM material WHERE component = ?', [slctshipment], (error, results, fields) => {
+        if (error) {
+            return response.status(500).json({ error: 'Internal Server Error' });
+        }
+
+        if (results.length === 0) {
+            return response.status(404).json({ error: 'Material not found' });
+        }
+
+        const materialId = results[0].id;
+        // Insert the serial number with the retrieved material id
+        pool.query('INSERT INTO serial_numbers (serial, matid, created_at, updated_at) VALUES (?, ?, ?, ?)', [shpsnmnly, materialId, created_at, created_at], (insertError, insertResults, insertFields) => {
+            if (insertError) {
+                return response.status(500).json({ error: 'Error inserting serial number' });
+            }
+
+            return response.json({ message: 'Serial Number added successfully' });
+        });
+    });
+});
 app.post('/get-sn', upload.none(),  (request, response) => {
     const shipId = request.body.slctshipment; // Correct the variable name to match the one used in the query
-    pool.query('SELECT * FROM serial_numbers WHERE shipid = ?', [shipId], (error, results, fields) => {
+    pool.query(`SELECT 
+	serial_numbers.id,
+	serial_numbers.serial,
+	material.component AS materialname
+   FROM serial_numbers 
+   JOIN material ON serial_numbers.matid = material.id 
+   WHERE serial_numbers.matid = '${shipId}'`, (error, results, fields) => {
         if (error) {
             return response.status(500).json({ error: 'Internal Server Error' });
         }
@@ -904,7 +934,7 @@ app.post('/update-userreq', upload.none(),  (request, response) => {
 		const fullname = results[0].fullname;
 		const address = results[0].mobile;
 		const email = results[0].email;
-		const concatenatedString = fullname + ', ' + email + ', ' + address;
+		const concatenatedString = fullname + '<br> ' + email + '<br> ' + address;
 		pool.query('UPDATE user_requisition SET mrcreatedby = ?, updated_at = ? WHERE rmnm = ?', [concatenatedString, updated_at, rmnm], (updateError, updateResults, updateFields) => {
             if (updateError) {
                 return response.status(500).json({ error: 'Error updating user requisition' });
@@ -929,7 +959,7 @@ app.post('/update-SNuserreq', upload.none(),  (request, response) => {
 		const fullname = results[0].fullname;
 		const address = results[0].mobile;
 		const email = results[0].email;
-		const concatenatedString = fullname + ', ' + email + ', ' + address;
+		const concatenatedString = fullname + '<br> ' + email + '<br> ' + address;
 		pool.query('UPDATE user_requisition SET sncreatedby	 = ?, updated_at = ? WHERE rmnm = ?', [concatenatedString, updated_at, rmnm], (updateError, updateResults, updateFields) => {
             if (updateError) {
                 return response.status(500).json({ error: 'Error updating user requisition' });
@@ -954,7 +984,7 @@ app.post('/update-Chuserreq', upload.none(),  (request, response) => {
 		const fullname = results[0].fullname;
 		const address = results[0].mobile;
 		const email = results[0].email;
-		const concatenatedString = fullname + ', ' + email + ', ' + address;
+		const concatenatedString = fullname + '<br> ' + email + '<br> ' + address;
 		pool.query('UPDATE user_requisition SET checkedby	 = ?, updated_at = ? WHERE rmnm = ?', [concatenatedString, updated_at, rmnm], (updateError, updateResults, updateFields) => {
             if (updateError) {
                 return response.status(500).json({ error: 'Error updating user requisition' });
@@ -979,7 +1009,7 @@ app.post('/update-Accuserreq', upload.none(),  (request, response) => {
 		const fullname = results[0].fullname;
 		const address = results[0].mobile;
 		const email = results[0].email;
-		const concatenatedString = fullname + ', ' + email + ', ' + address;
+		const concatenatedString = fullname + '<br> ' + email + '<br> ' + address;
 		pool.query('UPDATE user_requisition SET acceptedby	 = ?, updated_at = ? WHERE rmnm = ?', [concatenatedString, updated_at, rmnm], (updateError, updateResults, updateFields) => {
             if (updateError) {
                 return response.status(500).json({ error: 'Error updating user requisition' });
@@ -1004,7 +1034,7 @@ app.post('/update-Rvwuserreq', upload.none(),  (request, response) => {
 		const fullname = results[0].fullname;
 		const address = results[0].mobile;
 		const email = results[0].email;
-		const concatenatedString = fullname + ', ' + email + ', ' + address;
+		const concatenatedString = fullname + '<br> ' + email + '<br> ' + address;
 		pool.query('UPDATE user_requisition SET reviewby	 = ?, updated_at = ? WHERE rmnm = ?', [concatenatedString, updated_at, rmnm], (updateError, updateResults, updateFields) => {
             if (updateError) {
                 return response.status(500).json({ error: 'Error updating user requisition' });
@@ -1029,7 +1059,7 @@ app.post('/update-Appruserreq', upload.none(),  (request, response) => {
 		const fullname = results[0].fullname;
 		const address = results[0].mobile;
 		const email = results[0].email;
-		const concatenatedString = fullname + ', ' + email + ', ' + address;
+		const concatenatedString = fullname + '<br> ' + email + '<br> ' + address;
 		pool.query('UPDATE user_requisition SET approvedby	 = ?, updated_at = ? WHERE rmnm = ?', [concatenatedString, updated_at, rmnm], (updateError, updateResults, updateFields) => {
             if (updateError) {
                 return response.status(500).json({ error: 'Error updating user requisition' });
@@ -1221,4 +1251,3 @@ app.post('/getsiteqty', upload.none(),  (request, response) => {
 		return response.json({ data: results});
 	});
 });
-
