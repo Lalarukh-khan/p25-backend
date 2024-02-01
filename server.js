@@ -243,7 +243,8 @@ app.get('/get-material', (request, response) => {
  FROM material 
  JOIN material_types ON material.type = material_types.id 
  JOIN material_category ON material.slctcateg = material_category.id 
- JOIN subcategory ON material.slctsubcateg = subcategory.id`, (error, results, fields) => {
+ JOIN subcategory ON material.slctsubcateg = subcategory.id
+ ORDER BY material.id DESC`, (error, results, fields) => {
     if (error) {
       return response.status(500).json({ error: 'Material not found' });
     }
@@ -346,7 +347,8 @@ app.get('/get-allshipments', (request, response) => {
    JOIN material ON shipment.slctmat = material.id 
    JOIN warehouse ON shipment.slctwrhs = warehouse.id 
    JOIN subcategory ON shipment.slctsubcateg = subcategory.id 
-   JOIN material_types ON shipment.slcttype = material_types.id`, (error, results, fields) => {
+   JOIN material_types ON shipment.slcttype = material_types.id
+   ORDER BY shipment.id DESC`, (error, results, fields) => {
 		if (error) {
 		return response.status(500).json({ error: 'Shipment not found' });
 		}
@@ -405,7 +407,7 @@ app.post('/add-manufecturer', upload.none(),  (request, response) => {
 	});
 });
 app.get('/get-manufacturers', (request, response) => {
-    const selectQuery = 'SELECT * FROM manufacture';
+    const selectQuery = 'SELECT * FROM manufacture ORDER BY id DESC';
 	pool.query(selectQuery, (error, results, fields) => {
 		if (error) {
 		//   console.error('Error selecting from MySQL:', error);
@@ -479,7 +481,7 @@ app.post('/add-warehouse', upload.none(),  (request, response) => {
 	});
 });
 app.get('/get-warehouse', (request, response) => {
-    const selectQuery = 'SELECT * FROM warehouse';
+    const selectQuery = 'SELECT * FROM warehouse ORDER BY id DESC';
 	pool.query(selectQuery, (error, results, fields) => {
 		if (error) {
 		//   console.error('Error selecting from MySQL:', error);
@@ -517,7 +519,7 @@ app.post('/get-siteaddressbyId', upload.none(),  (request, response) => {
 	});
 });
 app.get('/get-site', (request, response) => {
-    const selectQuery = 'SELECT * FROM site';
+    const selectQuery = 'SELECT * FROM site ORDER BY id DESC';
 	pool.query(selectQuery, (error, results, fields) => {
 		if (error) {
 		//   console.error('Error selecting from MySQL:', error);
@@ -543,7 +545,7 @@ app.post('/add-company', upload.none(),  (request, response) => {
 	});
 });
 app.get('/get-company', (request, response) => {
-    const selectQuery = 'SELECT * FROM company';
+    const selectQuery = 'SELECT * FROM company ORDER BY id DESC';
 	pool.query(selectQuery, (error, results, fields) => {
 		if (error) {
 		//   console.error('Error selecting from MySQL:', error);
@@ -575,7 +577,7 @@ app.post('/add-user', upload.none(),  (request, response) => {
 	});
 });
 app.get('/get-user', (request, response) => {
-    const selectQuery = 'SELECT * FROM users';
+    const selectQuery = 'SELECT * FROM users ORDER BY id DESC';
 	pool.query(selectQuery, (error, results, fields) => {
 		if (error) {
 		//   console.error('Error selecting from MySQL:', error);
@@ -704,15 +706,25 @@ app.post('/get-sn', upload.none(),  (request, response) => {
         return response.json({ message: 'Response: Serial Number found successfully!', data: results });
     });
 });
-app.get('/get-allsn', upload.none(),  (request, response) => {
-    pool.query('SELECT * FROM serial_numbers', (error, results, fields) => {
+app.post('/get-allsnbyMat', upload.none(), (request, response) => {
+    const topid = request.body.topid;
+    pool.query('SELECT matid FROM requisition_lisiting WHERE rmnm = ?', [topid], (error, results, fields) => {
         if (error) {
             return response.status(500).json({ error: 'Internal Server Error' });
         }
+
         if (results.length === 0) {
             return response.status(404).json({ error: 'Serial Number not found in database' });
         }
-        return response.json({ message: 'Response: Serial Number found successfully!', data: results });
+
+        const matids = results.map(row => row.matid);
+        pool.query('SELECT * FROM serial_numbers WHERE matid IN (?)', [matids], (snError, snResults, snFields) => {
+            if (snError) {
+                return response.status(500).json({ error: 'Error fetching serial numbers' });
+            }
+
+            return response.json({ message: 'Response: Serial Numbers found successfully!', data: snResults });
+        });
     });
 });
 app.post('/request-requisition', upload.none(),  (request, response) => {
@@ -1088,7 +1100,8 @@ app.get('/get-allreqs', upload.none(), (request, response) => {
                 FROM requistion_request AS rr
                 JOIN company ON rr.companyid = company.id 
                 JOIN site ON rr.siteid = site.id
-                LEFT JOIN user_requisition AS ur ON rr.rm_number = ur.rmnm`, (error, results, fields) => {
+                LEFT JOIN user_requisition AS ur ON rr.rm_number = ur.rmnm
+				ORDER BY rr.id DESC`, (error, results, fields) => {
         if (error) {
             return response.status(500).json({ error: 'Internal Server Error' });
         }
@@ -1101,7 +1114,7 @@ app.get('/get-allreqs', upload.none(), (request, response) => {
 			if (row.rejected_by !== null) {
                 row.status = `Rejected By ${row.rejected_by}`;
             } else if (row.approvedby !== null) {
-                row.status = 'Awaiting For Delivery';
+                row.status = 'Waiting For Delivery';
             } else if (row.reviewby !== null) {
                 row.status = 'Waiting for Approval';
             } else if (row.acceptedby !== null) {
@@ -1109,7 +1122,7 @@ app.get('/get-allreqs', upload.none(), (request, response) => {
             } else if (row.checkedby !== null) {
                 row.status = 'Waiting for Accepted';
             } else if (row.sncreatedby !== null) {
-                row.status = 'Awaiting for checking';
+                row.status = 'Waiting for checking';
             } else if (row.mrcreatedby !== null) {
                 row.status = 'Waiting For S/N';
             } else {
@@ -1213,21 +1226,21 @@ app.get('/req-dashboard', (request, response) => {
     });
 });
 app.post('/getpuchaseqty', upload.none(),  (request, response) => {
-	const selectedValue = request.body.selectedValue;
-	pool.query('SELECT quantity FROM material WHERE slctsubcateg = ?', [selectedValue], (error, results, fields) => {
-		if (error) {
-			// console.error('Error executing SQL query:', error);
-		  return response.status(500).json({ error: 'Requisition not found' });
-		}
-		if(results.length === 0){
-			return response.status(500).json({ error: 'User Requisition not created in database' });
-		}
-		return response.json({ data: results});
-	});
+    const selectedValue = request.body.selectedValue;
+    pool.query('SELECT SUM(quantity) AS totalQuantity FROM material WHERE slctsubcateg = ? GROUP BY slctsubcateg', [selectedValue], (error, results, fields) => {
+        if (error) {
+            return response.status(500).json({ error: 'Internal Server Error' });
+        }
+        if (results.length === 0) {
+            return response.status(404).json({ error: 'No quantity found for the selected subcategory' });
+        }
+        return response.json({ data: results[0].totalQuantity });
+    });
 });
+
 app.post('/getwarehouseqty', upload.none(),  (request, response) => {
 	const selectedValue = request.body.selectedValue;
-	pool.query('SELECT receivedqty FROM shipment WHERE slctsubcateg = ?', [selectedValue], (error, results, fields) => {
+	pool.query('SELECT SUM(receivedqty) AS recievedQuantity FROM shipment WHERE slctsubcateg = ? GROUP BY slctsubcateg', [selectedValue], (error, results, fields) => {
 		if (error) {
 			// console.error('Error executing SQL query:', error);
 		  return response.status(500).json({ error: 'Requisition not found' });
@@ -1235,7 +1248,7 @@ app.post('/getwarehouseqty', upload.none(),  (request, response) => {
 		if(results.length === 0){
 			return response.status(500).json({ error: 'User Requisition not created in database' });
 		}
-		return response.json({ data: results});
+		return response.json({ data: results[0].recievedQuantity});
 	});
 });
 app.post('/getsiteqty', upload.none(),  (request, response) => {
