@@ -93,6 +93,17 @@ app.post('/delete-category', upload.none(),  (request, response) => {
     return response.json({ message: 'Response: Category deleted successfully!'});
   });
 });
+app.post('/delete-serial', upload.none(),  (request, response) => {
+	const slid = request.body.slid;
+  pool.query('DELETE FROM serial_numbers WHERE id = ?', [slid], (error, results, fields) => {
+    if (error) {
+    //   console.error('Category not created:', error);
+      return response.status(500).json({ error: 'Serial not Deleted' });
+    }
+    // console.log('User logged in successfully', results);
+    return response.json({ message: 'Response: Serial deleted successfully!'});
+  });
+});
 app.get('/get-catsubcat', (request, response) => {
     const selectQuery = 'SELECT * FROM material_category';
     pool.query(selectQuery, (error, categories, fields) => {
@@ -902,7 +913,7 @@ app.post('/add-requisitionlisiting', upload.none(),  (request, response) => {
 	const created_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
 	pool.query('INSERT INTO requisition_lisiting (rmnm, whid, packingno, categid, subcategid, typeid, matid, quantity, receivedqty, remainingqty, unit, addqty, rmqty, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [rmnm, slctwrhs, packingno, shpcat, slctshpsubcat, shptype, shpmatname, shppurchase, shpreceived, shpremaining, shounit, shpupdatedqty, shpremainingqty, created_at, created_at], (error, results, fields) => {
 		if (error) {
-			// console.error('Error executing SQL query:', error);
+			console.error('Error executing SQL query:', error);
 		  return response.status(500).json({ error: 'Requisition not found' });
 		}
 		// if(results.length === 0){
@@ -1044,7 +1055,7 @@ app.post('/get-reqbyRNMN', upload.none(),  (request, response) => {
 app.post('/update-lisitingsn', upload.none(),  (request, response) => {
 	const lsid = request.body.lsid;
 	const selectedCheckboxes = request.body.selectedCheckboxes;
-	const stringWithSpaces = selectedCheckboxes.replace(/,/g, ' ');
+	const stringWithSpaces = selectedCheckboxes.replace(/,/g, '<br> ');
 	const updated_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
 	pool.query('UPDATE requisition_lisiting SET addsl = ?, updated_at = ? WHERE id = ?', [stringWithSpaces, updated_at, lsid], (error, results, fields) => {
 		if (error) {
@@ -1243,25 +1254,27 @@ app.post('/update-Appruserreq', upload.none(),  (request, response) => {
 });
 app.get('/get-allreqs', upload.none(), (request, response) => {
     pool.query(`SELECT 
-                    rr.id,
-                    rr.rm_number,
-                    rr.created_by,
-                    rr.outbound,
-                    rr.created_at,
-                    site.sitename AS sitename,
-                    company.compname AS compname,
-                    ur.mrcreatedby,
-                    ur.sncreatedby,
-                    ur.checkedby,
-                    ur.acceptedby,
-                    ur.reviewby,
-                    ur.approvedby,
-                    ur.rejected_by
-                FROM requistion_request AS rr
-                JOIN company ON rr.companyid = company.id 
-                JOIN site ON rr.siteid = site.id
-                LEFT JOIN user_requisition AS ur ON rr.rm_number = ur.rmnm
-				ORDER BY rr.id DESC`, (error, results, fields) => {
+    rr.id,
+    rr.rm_number,
+    rr.created_by,
+    rr.outbound,
+    rr.created_at,
+    site.sitename AS sitename,
+    company.compname AS compname,
+    ur.mrcreatedby,
+    ur.sncreatedby,
+    ur.checkedby,
+    ur.acceptedby,
+    ur.reviewby,
+    ur.approvedby,
+    ur.rejected_by
+FROM requistion_request AS rr
+JOIN company ON rr.companyid = company.id 
+JOIN site ON rr.siteid = site.id
+LEFT JOIN user_requisition AS ur ON rr.rm_number = ur.rmnm
+JOIN requisition_lisiting AS rl ON rr.rm_number = rl.rmnm
+ORDER BY rr.id DESC
+`, (error, results, fields) => {
         if (error) {
             return response.status(500).json({ error: 'Internal Server Error' });
         }
