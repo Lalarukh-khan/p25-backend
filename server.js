@@ -419,11 +419,11 @@ app.get('/get-manufacturers', (request, response) => {
 });
 app.post('/add-serial', upload.none(),  (request, response) => {
 	const serial_id = request.body.matsid;
-	const slctshipment = request.body.slctshipment;
+	const slctwrhs = request.body.slctwrhs;
 	const shpquantity = request.body.shpquantity;
 	const slctmnf_id = request.body.slctmnf_id;
 	const created_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
-	pool.query('INSERT INTO material_serial (serial_id, slctshipment, shpquantity, slctmnf_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)', [serial_id, slctshipment, shpquantity, slctmnf_id, created_at, created_at], (error, results, fields) => {
+	pool.query('INSERT INTO material_serial (serial_id, whid, shpquantity, slctmnf_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)', [serial_id, slctwrhs, shpquantity, slctmnf_id, created_at, created_at], (error, results, fields) => {
 		if (error) {
 		  return response.status(500).json({ error: 'Serial not found' });
 		}
@@ -707,25 +707,29 @@ app.post('/get-sn', upload.none(),  (request, response) => {
     });
 });
 app.post('/get-allsnbyMat', upload.none(), (request, response) => {
-    const topid = request.body.topid;
-    pool.query('SELECT matid FROM requisition_lisiting WHERE rmnm = ?', [topid], (error, results, fields) => {
-        if (error) {
-            return response.status(500).json({ error: 'Internal Server Error' });
-        }
+    const matid = request.body.matid;
+    // pool.query('SELECT matid FROM requisition_lisiting WHERE rmnm = ?', [topid], (error, results, fields) => {
+    //     if (error) {
+    //         return response.status(500).json({ error: 'Internal Server Error' });
+    //     }
 
-        if (results.length === 0) {
-            return response.status(404).json({ error: 'Serial Number not found in database' });
-        }
+    //     if (results.length === 0) {
+    //         return response.status(404).json({ error: 'Serial Number not found in database' });
+    //     }
 
-        const matids = results.map(row => row.matid);
-        pool.query('SELECT * FROM serial_numbers WHERE matid IN (?)', [matids], (snError, snResults, snFields) => {
-            if (snError) {
-                return response.status(500).json({ error: 'Error fetching serial numbers' });
-            }
+    //     const matids = results.map(row => row.matid);
+        pool.query('SELECT * FROM serial_numbers WHERE matid = ?', [matid], (error, results, fields) => {
+			if (error) {
+				return response.status(500).json({ error: 'Internal Server Error' });
+			}
+	
+			if (results.length === 0) {
+				return response.status(404).json({ error: 'Serial Number not found in database' });
+			}
 
-            return response.json({ message: 'Response: Serial Numbers found successfully!', data: snResults });
+            return response.json({ message: 'Response: Serial Numbers found successfully!', data: results });
         });
-    });
+    // });
 });
 app.post('/request-requisition', upload.none(),  (request, response) => {
 	const rmnm = request.body.rmnm;
@@ -878,11 +882,9 @@ app.post('/get-valuesbypack', upload.none(), (request, response) => {
             }
             return false; // Skip this result
         });
-		console.log(filteredResults);
         return response.json({ message: 'Response: Shipment found successfully here!', data: filteredResults });
     });
 });
-
 app.post('/add-requisitionlisiting', upload.none(),  (request, response) => {
 	const rmnm = request.body.rmnm;
 	const slctwrhs = request.body.slctwrhs;
@@ -950,6 +952,7 @@ app.post('/get-reqbyRNMN', upload.none(),  (request, response) => {
 	const shpid = request.body.shpid;
 	pool.query(`SELECT 
 	requisition_lisiting.id,
+	requisition_lisiting.matid,
 	requisition_lisiting.packingno,
 	requisition_lisiting.addsl,
 	requisition_lisiting.unit,
@@ -1255,21 +1258,35 @@ app.post('/check-userauth', upload.none(),  (request, response) => {
 		// return response.json({ message: 'Response: User Requisition created successfully!'});
 	});
 });
-app.post('/reject-req', upload.none(),  (request, response) => {
-	const email = request.body.email;
-	const rmnm = request.body.rmnm;
-	const rejectnote = request.body.rejectnote;
-	const updated_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
-	pool.query('UPDATE user_requisition SET reject_note	 = ?, rejected_by	 = ?, updated_at = ? WHERE rmnm = ?', [rejectnote, email, updated_at, rmnm], (error, results, fields) => {
-		if (error) {
-			// console.error('Error executing SQL query:', error);
-		  return response.status(500).json({ error: 'Requisition not found' });
-		}
-		if(results.length === 0){
-			return response.status(500).json({ error: 'User Requisition not created in database' });
-		}
-		return response.json({ message: 'Response: User Requisition updated successfully!' });
-	});
+app.post('/reject-req', upload.none(), (request, response) => {
+    const email = request.body.email;
+    const rmnm = request.body.rmnm;
+    const rejectnote = request.body.rejectnote;
+    const updated_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
+
+    // First, fetch the username associated with the provided email from the users table
+    pool.query('SELECT username FROM users WHERE email = ?', [email], (error, userResults, fields) => {
+        if (error) {
+            return response.status(500).json({ error: 'Internal Server Error' });
+        }
+        if (userResults.length === 0) {
+            return response.status(404).json({ error: 'User not found in database' });
+        }
+
+        // Extract the username from the results
+        const username = userResults[0].username;
+
+        // Update the rejected_by column in the user_requisition table
+        pool.query('UPDATE user_requisition SET reject_note = ?, rejected_by = ?, updated_at = ? WHERE rmnm = ?', [rejectnote, username, updated_at, rmnm], (error, results, fields) => {
+            if (error) {
+                return response.status(500).json({ error: 'Requisition not found' });
+            }
+            if (results.affectedRows === 0) {
+                return response.status(500).json({ error: 'User Requisition not updated in database' });
+            }
+            return response.json({ message: 'Response: User Requisition updated successfully!' });
+        });
+    });
 });
 app.get('/req-dashboard', (request, response) => {
     // Query to count total number of rows
