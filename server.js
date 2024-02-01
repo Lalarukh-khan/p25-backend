@@ -782,6 +782,107 @@ app.post('/get-shipmentvaluesbyWH', upload.none(),  (request, response) => {
         return response.json({ message: 'Response: Shipment found successfully!', data: results });
     });
 });
+app.post('/get-matvalbypack', upload.none(),  (request, response) => {
+    const matid = request.body.matid; // Correct the variable name to match the one used in the query
+    pool.query(`SELECT 
+	shipment.quantity, 
+	shipment.receivedqty,
+	shipment.remainingqty, 
+	material.description AS materialdescription,
+	material.activeButtonText AS materialunit,
+	(SELECT COUNT(*) FROM serial_numbers WHERE matid = '${matid}') AS total_sn
+   FROM shipment 
+   JOIN material ON shipment.slctmat = material.id  
+   WHERE shipment.slctmat = '${matid}'`, (error, results, fields) => {
+        if (error) {
+            return response.status(500).json({ error: 'Internal Server Error' });
+        }
+        if (results.length === 0) {
+            return response.status(404).json({ error: 'Shipment not found in database' });
+        }
+        return response.json({ message: 'Response: Shipment found successfully!', data: results });
+    });
+});
+app.post('/get-packingvaluesbyWH', upload.none(), (request, response) => {
+    const shpid = request.body.shpid;
+    pool.query(`SELECT DISTINCT packingno FROM shipment WHERE slctwrhs = '${shpid}'`, (error, results, fields) => {
+        if (error) {
+            return response.status(500).json({ error: 'Internal Server Error' });
+        }
+        if (results.length === 0) {
+            return response.status(404).json({ error: 'Shipment not found in database' });
+        }
+        
+        // Extract unique values using Set
+        const uniquePackingNumbers = [...new Set(results.map(item => item.packingno))];
+        
+        return response.json({ message: 'Response: Shipment found successfully!', data: uniquePackingNumbers });
+    });
+});
+// app.post('/get-valuesbypack', upload.none(),  (request, response) => {
+//     const packid = request.body.packid; // Correct the variable name to match the one used in the query
+//     pool.query(`SELECT 
+// 	shipment.slctcateg, 
+// 	shipment.slctmat, 
+// 	shipment.slcttype,  
+// 	material_category.name AS categoryname,
+// 	material.component AS materialname,
+// 	material_types.name AS typename
+//    FROM shipment 
+//    JOIN material_category ON shipment.slctcateg = material_category.id 
+//    JOIN material ON shipment.slctmat = material.id 
+//    JOIN subcategory ON shipment.slctsubcateg = subcategory.id 
+//    JOIN material_types ON shipment.slcttype = material_types.id   
+//    WHERE shipment.packingno = '${packid}'`, (error, results, fields) => {
+//         if (error) {
+//             return response.status(500).json({ error: 'Internal Server Error' });
+//         }
+//         if (results.length === 0) {
+//             return response.status(404).json({ error: 'Shipment not found in database' });
+//         }
+//         return response.json({ message: 'Response: Shipment found successfully!', data: results });
+//     });
+// });
+app.post('/get-valuesbypack', upload.none(), (request, response) => {
+    const packid = request.body.packid;
+    pool.query(`SELECT
+		shipment.id, 
+        shipment.slctcateg, 
+        shipment.slctmat, 
+        shipment.slcttype,  
+        material_category.name AS categoryname,
+        material.component AS materialname,
+        material_types.name AS typename
+    FROM shipment 
+    JOIN material_category ON shipment.slctcateg = material_category.id 
+    JOIN material ON shipment.slctmat = material.id 
+    JOIN subcategory ON shipment.slctsubcateg = subcategory.id 
+    JOIN material_types ON shipment.slcttype = material_types.id   
+    WHERE shipment.packingno = '${packid}'`, (error, results, fields) => {
+        if (error) {
+            return response.status(500).json({ error: 'Internal Server Error' });
+        }
+        if (results.length === 0) {
+            return response.status(404).json({ error: 'Shipment not found in database' });
+        }
+
+        // Create a Map to store unique combinations of certain columns
+        const uniqueCombinations = new Map();
+
+        // Filter results to remove duplicates based on slctcateg, slctmat, and slcttype
+        const filteredResults = results.filter(result => {
+            const combination = `${result.slctcateg}-${result.slctmat}-${result.slcttype}`;
+            if (!uniqueCombinations.has(combination)) {
+                uniqueCombinations.set(combination, true);
+                return true; // Include this result
+            }
+            return false; // Skip this result
+        });
+		console.log(filteredResults);
+        return response.json({ message: 'Response: Shipment found successfully here!', data: filteredResults });
+    });
+});
+
 app.post('/add-requisitionlisiting', upload.none(),  (request, response) => {
 	const rmnm = request.body.rmnm;
 	const slctwrhs = request.body.slctwrhs;
