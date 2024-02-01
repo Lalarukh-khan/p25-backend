@@ -924,6 +924,61 @@ app.post('/add-requisitionlisiting', upload.none(),  (request, response) => {
         });
 	});
 });
+app.post('/update-requisitionlisiting', upload.none(),  (request, response) => {
+	const listid = request.body.listid;
+	const slctwrhs = request.body.slctwrhs;
+	const packingno = request.body.packingno;
+	const shpcat = request.body.shpcat;
+	const slctshpsubcat = request.body.slctshpsubcat;
+	const shptype = request.body.shptype;
+	const shpmatname = request.body.shpmatname;
+	const shppurchase = request.body.shppurchase;
+	const shpreceived = request.body.shpreceived;
+	const shpremaining = request.body.shpremaining;
+	const shounit = request.body.shounit;
+	const shpupdatedqty = request.body.shpupdatedqty;
+	const shpremainingqty = request.body.shpremainingqty;
+	const updated_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
+	pool.query('UPDATE requisition_lisiting SET whid = ?, packingno = ?, categid = ?, subcategid = ?, typeid = ?, matid = ?, quantity = ?, receivedqty = ?, remainingqty = ?, unit = ?, addqty = ?, rmqty = ?, updated_at = ? WHERE id = ?', [slctwrhs, packingno, shpcat, slctshpsubcat, shptype, shpmatname, shppurchase, shpreceived, shpremaining, shounit, shpupdatedqty, shpremainingqty, updated_at, listid], (error, results, fields) => {
+		if (error) {
+			console.error('Error executing SQL query:', error);
+		  return response.status(500).json({ error: 'Requisition not found' });
+		}
+		if (results.length === 0) {
+			return response.status(500).json({ error: 'Inserted row not found' });
+		}
+		return response.json({ message: 'Response: Requisition Listing created successfully!' });
+	});
+});
+app.post('/update-requisitionwhole', upload.none(), (request, response) => {
+    const topid = request.body.topid;
+    const updated_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
+
+    // Update user_requisition table
+    pool.query('UPDATE user_requisition SET sncreatedby = ?, checkedby = ?, acceptedby = ?, reviewby = ?, approvedby = ?, rejected_by = ?, reject_note = ?, updated_at = ? WHERE rmnm = ?', [null, null, null, null, null, null, null, updated_at, topid], (error, results, fields) => {
+        if (error) {
+            console.error('Error executing SQL query:', error);
+            return response.status(500).json({ error: 'Requisition not found' });
+        }
+        if (results.affectedRows === 0) {
+            return response.status(404).json({ error: 'No rows updated in user_requisition table' });
+        }
+
+        // After updating user_requisition table, update requisition_listing table
+        pool.query('UPDATE requisition_lisiting SET addsl = NULL WHERE rmnm = ?', [topid], (error, results, fields) => {
+            if (error) {
+                console.error('Error executing SQL query:', error);
+                return response.status(500).json({ error: 'Error updating requisition_listing table' });
+            }
+            if (results.affectedRows === 0) {
+                return response.status(404).json({ error: 'No rows updated in requisition_listing table' });
+            }
+            
+            return response.json({ message: 'Requisition Listing updated successfully!' });
+        });
+    });
+});
+
 app.post('/get-reqbyId', upload.none(),  (request, response) => {
 	const shpid = request.body.shpid;
 	pool.query(`SELECT 
@@ -964,6 +1019,7 @@ app.post('/get-reqbyRNMN', upload.none(),  (request, response) => {
 	requistion_request.ppperson,
 	requistion_request.ppnumber,
 	requistion_request.trsmode,
+	requistion_request.created_by,
 	requistion_request.trsnumber,
 	site.sitename,
 	site.sitelocation,
@@ -1371,7 +1427,7 @@ app.post('/getwarehouseqty', upload.none(),  (request, response) => {
 });
 app.post('/getsiteqty', upload.none(),  (request, response) => {
 	const selectedValue = request.body.selectedValue;
-	pool.query('SELECT addqty FROM requisition_lisiting WHERE subcategid = ?', [selectedValue], (error, results, fields) => {
+	pool.query('SELECT SUM(addqty) AS siteQuantity FROM requisition_lisiting WHERE subcategid = ? GROUP BY subcategid', [selectedValue], (error, results, fields) => {
 		if (error) {
 			// console.error('Error executing SQL query:', error);
 		  return response.status(500).json({ error: 'Requisition not found' });
@@ -1379,6 +1435,6 @@ app.post('/getsiteqty', upload.none(),  (request, response) => {
 		if(results.length === 0){
 			return response.status(500).json({ error: 'User Requisition not created in database' });
 		}
-		return response.json({ data: results});
+		return response.json({ data: results[0].siteQuantity});
 	});
 });
