@@ -2,6 +2,9 @@ const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
 const mysql = require('mysql2');
+const fs = require('fs');
+const path = require('path');
+const uuid = require('uuid').v4;
 
 const app = express();
 app.use(cors());
@@ -19,6 +22,18 @@ app.listen(5000, () => {
 });
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
+// // const upload = multer({ dest: 'public/assets' });
+const storagefile = multer.diskStorage({
+	destination: function (req, file, cb) {
+	  cb(null, 'public/assets'); // Destination folder for uploaded files
+	},
+	filename: function (req, file, cb) {
+	  cb(null, file.originalname); // Use the original filename
+	}
+  });
+  
+  // Initialize multer with the storage options
+  const uploadfile = multer({ storage: storagefile });
 
 app.post('/login', upload.none(),  (request, response) => {
 	// console.log('Received request:', request.body);
@@ -1267,14 +1282,16 @@ app.get('/get-allreqs', upload.none(), (request, response) => {
     ur.acceptedby,
     ur.reviewby,
     ur.approvedby,
-    ur.rejected_by
-FROM requistion_request AS rr
-JOIN company ON rr.companyid = company.id 
-JOIN site ON rr.siteid = site.id
-LEFT JOIN user_requisition AS ur ON rr.rm_number = ur.rmnm
-JOIN requisition_lisiting AS rl ON rr.rm_number = rl.rmnm
-ORDER BY rr.id DESC
-`, (error, results, fields) => {
+    ur.id AS userid,
+    ur.rejected_by,
+    ur.attach_file
+	FROM requistion_request AS rr
+	JOIN company ON rr.companyid = company.id 
+	JOIN site ON rr.siteid = site.id
+	LEFT JOIN user_requisition AS ur ON rr.rm_number = ur.rmnm
+	JOIN requisition_lisiting AS rl ON rr.rm_number = rl.rmnm
+	ORDER BY rr.id DESC
+	`, (error, results, fields) => {
         if (error) {
             return response.status(500).json({ error: 'Internal Server Error' });
         }
@@ -1284,7 +1301,9 @@ ORDER BY rr.id DESC
 
         // Iterate over the results to determine the status for each row
         const formattedResults = results.map(row => {
-			if (row.rejected_by !== null) {
+			if (row.attach_file !== null) {
+                row.status = `Completed`;
+            } else if (row.rejected_by !== null) {
                 row.status = `Rejected By ${row.rejected_by}`;
             } else if (row.approvedby !== null) {
                 row.status = 'Waiting For Delivery';
@@ -1395,7 +1414,7 @@ app.get('/req-dashboard', (request, response) => {
 						}
 						const attachRows = AttachfileResults[0].attach_file;
 		
-						pool.query(`SELECT COUNT(*) AS install_status FROM user_requisition WHERE install_status IS NOT NULL`, (InstallError, InstallResults, AttachFields) => {
+						pool.query(`SELECT COUNT(*) AS install_status FROM user_requisition WHERE attach_file IS NOT NULL`, (InstallError, InstallResults, AttachFields) => {
 							if (InstallError) {
 								return response.status(500).json({ error: 'Internal Server Error' });
 							}
@@ -1424,7 +1443,6 @@ app.post('/getpuchaseqty', upload.none(),  (request, response) => {
         return response.json({ data: results[0].totalQuantity });
     });
 });
-
 app.post('/getwarehouseqty', upload.none(),  (request, response) => {
 	const selectedValue = request.body.selectedValue;
 	pool.query('SELECT SUM(receivedqty) AS recievedQuantity FROM shipment WHERE slctsubcateg = ? GROUP BY slctsubcateg', [selectedValue], (error, results, fields) => {
@@ -1450,4 +1468,25 @@ app.post('/getsiteqty', upload.none(),  (request, response) => {
 		}
 		return response.json({ data: results[0].siteQuantity});
 	});
+});
+app.post('/mrfileupload', uploadfile.single('file'), (req, res) => {
+    const uploadedFile = req.file;
+    const id = req.body.id;
+    const uniqueFilename = uuid() + '-' + uploadedFile.originalname;
+    const filePathInDatabase = `/assets/${uniqueFilename}`;
+    const fileStoragePath = path.resolve(__dirname, 'public', 'assets', uniqueFilename);
+    fs.rename(uploadedFile.path, fileStoragePath, (err) => {
+        if (err) {
+            console.error('Error moving file:', err);
+            return res.status(500).json({ error: 'Internal Server Error' });
+        }
+        // Update the database with the new file path
+        pool.query('UPDATE user_requisition SET attach_file = ? WHERE id = ?', [filePathInDatabase, id], (error, results, fields) => {
+            if (error) {
+                console.error('Error inserting file path into database:', error);
+                return res.status(500).json({ error: 'Internal Server Error' });
+            }
+            return res.json({ message: 'Response: File uploaded successfully!' });
+        });
+    });
 });
