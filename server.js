@@ -1484,6 +1484,45 @@ app.post('/getwarehouseqty', upload.none(),  (request, response) => {
 		return response.json({ data: results[0].recievedQuantity});
 	});
 });
+app.post('/getpuchaseqtybyctg', upload.none(),  (request, response) => {
+    const selectedValue = request.body.selectedValue;
+    pool.query('SELECT SUM(quantity) AS totalQuantity FROM material WHERE slctcateg = ? GROUP BY slctcateg', [selectedValue], (error, results, fields) => {
+        if (error) {
+			console.log(error);
+            return response.status(500).json({ error: 'Internal Server Error' });
+        }
+        if (results.length === 0) {
+            return response.status(404).json({ error: 'No quantity found for the selected subcategory' });
+        }
+        return response.json({ data: results[0].totalQuantity });
+    });
+});
+app.post('/getwarehouseqtybyctg', upload.none(),  (request, response) => {
+	const selectedValue = request.body.selectedValue;
+	pool.query('SELECT SUM(receivedqty) AS recievedQuantity FROM shipment WHERE slctcateg = ? GROUP BY slctcateg', [selectedValue], (error, results, fields) => {
+		if (error) {
+			// console.error('Error executing SQL query:', error);
+		  return response.status(500).json({ error: 'Requisition not found' });
+		}
+		if(results.length === 0){
+			return response.status(500).json({ error: 'User Requisition not created in database' });
+		}
+		return response.json({ data: results[0].recievedQuantity});
+	});
+});
+app.post('/getsiteqtybyctg', upload.none(),  (request, response) => {
+	const selectedValue = request.body.selectedValue;
+	pool.query('SELECT SUM(addqty) AS siteQuantity FROM requisition_lisiting WHERE categid = ? GROUP BY categid', [selectedValue], (error, results, fields) => {
+		if (error) {
+			// console.error('Error executing SQL query:', error);
+		  return response.status(500).json({ error: 'Requisition not found' });
+		}
+		if(results.length === 0){
+			return response.status(500).json({ error: 'User Requisition not created in database' });
+		}
+		return response.json({ data: results[0].siteQuantity});
+	});
+});
 app.post('/getsiteqty', upload.none(),  (request, response) => {
 	const selectedValue = request.body.selectedValue;
 	pool.query('SELECT SUM(addqty) AS siteQuantity FROM requisition_lisiting WHERE subcategid = ? GROUP BY subcategid', [selectedValue], (error, results, fields) => {
@@ -1501,7 +1540,7 @@ app.post('/mrfileupload', uploadfile.single('file'), (req, res) => {
     const uploadedFile = req.file;
     const id = req.body.id;
     const uniqueFilename = uuid() + '-' + uploadedFile.originalname;
-    const filePathInDatabase = `/assets/${uniqueFilename}`;
+    const filePathInDatabase = `public/assets/${uniqueFilename}`;
     const fileStoragePath = path.resolve(__dirname, 'public', 'assets', uniqueFilename);
     fs.rename(uploadedFile.path, fileStoragePath, (err) => {
         if (err) {
@@ -1516,5 +1555,27 @@ app.post('/mrfileupload', uploadfile.single('file'), (req, res) => {
             }
             return res.json({ message: 'Response: File uploaded successfully!' });
         });
+    });
+});
+app.post('/downloadFile', uploadfile.none(), (req, res) => {
+    const id = req.body.id;
+    pool.query('SELECT attach_file FROM user_requisition WHERE id = ?', [id], (error, results, fields) => {
+        if (error) {
+            return res.status(500).json({ error: 'Internal Server Error' });
+        }
+        if (results.length === 0) {
+            return res.status(404).json({ error: 'File not found in database' });
+        }
+        const filePath = results[0].attach_file;
+        if (!filePath) {
+            return res.status(500).json({ message: 'Response: No file uploaded' });
+        }
+        // Set the appropriate headers for file download
+        res.setHeader('Content-Disposition', 'attachment; filename=downloadedFile');
+        res.setHeader('Content-Type', 'application/octet-stream');
+        
+        // Send the file as a stream directly to the response
+        const fileStream = fs.createReadStream(filePath);
+        fileStream.pipe(res);
     });
 });
