@@ -108,6 +108,34 @@ app.post('/delete-category', upload.none(),  (request, response) => {
     return response.json({ message: 'Response: Category deleted successfully!'});
   });
 });
+app.post('/update-subcategory', upload.none(),  (request, response) => {
+	const categid = request.body.categid;
+	const newname = request.body.newname;
+	const updated_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
+  pool.query('UPDATE subcategory SET name = ?, updated_at = ? WHERE id = ?', [newname, updated_at, categid], (error, results, fields) => {
+    if (error) {
+    //   console.error('Category not created:', error);
+      return response.status(500).json({ error: 'Sub Category not found' });
+    }
+	if(results.length === 0){
+		// console.log('Admin not found in database', results);
+		return response.status(500).json({ error: 'Sub Category not updated in database' });
+	}
+    // console.log('User logged in successfully', results);
+    return response.json({ message: 'Response: Sub Category updated successfully!'});
+  });
+});
+app.post('/delete-subcategory', upload.none(),  (request, response) => {
+	const categid = request.body.categid;
+  pool.query('DELETE FROM subcategory WHERE id = ?', [categid], (error, results, fields) => {
+    if (error) {
+    //   console.error('Category not created:', error);
+      return response.status(500).json({ error: 'Sub Category not Deleted' });
+    }
+    // console.log('User logged in successfully', results);
+    return response.json({ message: 'Response: Sub Category deleted successfully!'});
+  });
+});
 app.post('/delete-serial', upload.none(),  (request, response) => {
 	const slid = request.body.slid;
   pool.query('DELETE FROM serial_numbers WHERE id = ?', [slid], (error, results, fields) => {
