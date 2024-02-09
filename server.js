@@ -1296,29 +1296,36 @@ app.post('/update-Appruserreq', upload.none(),  (request, response) => {
 	});
 });
 app.get('/get-allreqs', upload.none(), (request, response) => {
-    pool.query(`SELECT 
-    rr.id,
-    rr.rm_number,
-    rr.created_by,
-    rr.outbound,
-    rr.created_at,
-    site.sitename AS sitename,
-    company.compname AS compname,
-    ur.mrcreatedby,
-    ur.sncreatedby,
-    ur.checkedby,
-    ur.acceptedby,
-    ur.reviewby,
-    ur.approvedby,
-    ur.id AS userid,
-    ur.rejected_by,
-    ur.attach_file
+    pool.query(`WITH UniqueRMNumbers AS (
+		SELECT 
+			rr.rm_number,
+			ROW_NUMBER() OVER (PARTITION BY rr.rm_number ORDER BY rr.id DESC) AS RowNum
+		FROM requistion_request AS rr
+		JOIN requisition_lisiting AS rl ON rr.rm_number = rl.rmnm
+	)
+	SELECT 
+		rr.id,
+		rr.rm_number,
+		rr.created_by,
+		rr.outbound,
+		rr.created_at,
+		site.sitename AS sitename,
+		company.compname AS compname,
+		ur.mrcreatedby,
+		ur.sncreatedby,
+		ur.checkedby,
+		ur.acceptedby,
+		ur.reviewby,
+		ur.approvedby,
+		ur.id AS userid,
+		ur.rejected_by,
+		ur.attach_file
 	FROM requistion_request AS rr
 	JOIN company ON rr.companyid = company.id 
 	JOIN site ON rr.siteid = site.id
 	LEFT JOIN user_requisition AS ur ON rr.rm_number = ur.rmnm
-	JOIN requisition_lisiting AS rl ON rr.rm_number = rl.rmnm
-	ORDER BY rr.id DESC
+	JOIN UniqueRMNumbers AS urn ON rr.rm_number = urn.rm_number AND urn.RowNum = 1
+	ORDER BY rr.id DESC;
 	`, (error, results, fields) => {
         if (error) {
             return response.status(500).json({ error: 'Internal Server Error' });
@@ -1342,7 +1349,7 @@ app.get('/get-allreqs', upload.none(), (request, response) => {
             } else if (row.checkedby !== null) {
                 row.status = 'Waiting for Accepted';
             } else if (row.sncreatedby !== null) {
-                row.status = 'Waiting for checking';
+                row.status = 'Waiting for Checking';
             } else if (row.mrcreatedby !== null) {
                 row.status = 'Waiting For S/N';
             } else {
@@ -1436,7 +1443,7 @@ app.get('/req-dashboard', (request, response) => {
 						return response.status(500).json({ error: 'Internal Server Error' });
 					}
 					const completedRows = CompletedResults[0].completed;
-					pool.query(`SELECT COUNT(*) AS attach_file FROM user_requisition WHERE attach_file IS NOT NULL`, (AttachFileError, AttachfileResults, AttachFields) => {
+					pool.query(`SELECT COUNT(*) AS attach_file FROM user_requisition WHERE attach_file IS NULL AND approvedby IS NOT NULL`, (AttachFileError, AttachfileResults, AttachFields) => {
 						if (AttachFileError) {
 							return response.status(500).json({ error: 'Internal Server Error' });
 						}
@@ -1578,4 +1585,15 @@ app.post('/downloadFile', uploadfile.none(), (req, res) => {
         const fileStream = fs.createReadStream(filePath);
         fileStream.pipe(res);
     });
+});
+app.post('/delete-rqlisting', upload.none(),  (request, response) => {
+	const categid = request.body.categid;
+  pool.query('DELETE FROM requisition_lisiting WHERE id = ?', [categid], (error, results, fields) => {
+    if (error) {
+    //   console.error('Category not created:', error);
+      return response.status(500).json({ error: 'Requistion Listing not Deleted' });
+    }
+    // console.log('User logged in successfully', results);
+    return response.json({ message: 'Response: Requistion Listing deleted successfully!'});
+  });
 });
