@@ -1319,6 +1319,7 @@ app.get('/get-allreqs', upload.none(), (request, response) => {
 		ur.approvedby,
 		ur.id AS userid,
 		ur.rejected_by,
+		ur.reject_note,
 		ur.attach_file
 	FROM requistion_request AS rr
 	JOIN company ON rr.companyid = company.id 
