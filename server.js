@@ -861,6 +861,23 @@ app.post('/get-matvalbypack', upload.none(),  (request, response) => {
         return response.json({ message: 'Response: Shipment found successfully!', data: results });
     });
 });
+app.post('/get-categorybywarehouse', upload.none(), (request, response) => {
+    const shpid = request.body.shpid;
+    pool.query(`SELECT
+	shipment.slctcateg, 
+	material_category.name AS categoryname
+FROM shipment 
+JOIN material_category ON shipment.slctcateg = material_category.id  
+WHERE shipment.slctwrhs = '${shpid}'`, (error, results, fields) => {
+        if (error) {
+            return response.status(500).json({ error: 'Internal Server Error' });
+        }
+        if (results.length === 0) {
+            return response.status(404).json({ error: 'Shipment not found in database' });
+        }
+        return response.json({ message: 'Response: Shipment found successfully!', data: results });
+    });
+});
 app.post('/get-packingvaluesbyWH', upload.none(), (request, response) => {
     const shpid = request.body.shpid;
     pool.query(`SELECT DISTINCT packingno FROM shipment WHERE slctwrhs = '${shpid}'`, (error, results, fields) => {
@@ -875,6 +892,27 @@ app.post('/get-packingvaluesbyWH', upload.none(), (request, response) => {
         const uniquePackingNumbers = [...new Set(results.map(item => item.packingno))];
         
         return response.json({ message: 'Response: Shipment found successfully!', data: uniquePackingNumbers });
+    });
+});
+app.post('/get-subcategorybyWH', upload.none(), (request, response) => {
+    const catid = request.body.catid;
+    const shpid = request.body.shpid;
+    pool.query(`SELECT
+	shipment.slctsubcateg,
+	shipment.slcttype, 
+	subcategory.name AS subcategoryname,
+	material_types.name AS typename
+FROM shipment 
+JOIN subcategory ON shipment.slctsubcateg = subcategory.id  
+JOIN material_types ON shipment.slcttype = material_types.id  
+WHERE shipment.slctwrhs = '${shpid}' AND shipment.slctcateg = '${catid}'`, (error, results, fields) => {
+        if (error) {
+            return response.status(500).json({ error: 'Internal Server Error' });
+        }
+        if (results.length === 0) {
+            return response.status(404).json({ error: 'Shipment not found in database' });
+        }
+        return response.json({ message: 'Response: Shipment found successfully!', data: results });
     });
 });
 // app.post('/get-valuesbypack', upload.none(),  (request, response) => {
