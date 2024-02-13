@@ -991,30 +991,67 @@ app.post('/add-requisitionlisiting', upload.none(),  (request, response) => {
 	const shounit = request.body.shounit;
 	const shpupdatedqty = request.body.shpupdatedqty;
 	const shpremainingqty = request.body.shpremainingqty;
+	const shpaddedqty = request.body.shpaddedqty;
 	const created_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
-	pool.query('INSERT INTO requisition_lisiting (rmnm, whid, packingno, categid, subcategid, typeid, matid, quantity, receivedqty, remainingqty, unit, addqty, rmqty, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [rmnm, slctwrhs, packingno, shpcat, slctshpsubcat, shptype, shpmatname, shppurchase, shpreceived, shpremaining, shounit, shpupdatedqty, shpremainingqty, created_at, created_at], (error, results, fields) => {
-		if (error) {
-			console.error('Error executing SQL query:', error);
-		  return response.status(500).json({ error: 'Requisition not found' });
-		}
-		// if(results.length === 0){
-		// 	return response.status(500).json({ error: 'Requisition Listing not created in database' });
-		// }
-		// return response.json({ message: 'Response: Requisition Listing created successfully!', data: results});
-		pool.query('SELECT * FROM requisition_lisiting WHERE id = ?', results.insertId, (selectError, selectResults, selectFields) => {
-            if (selectError) {
-                return response.status(500).json({ error: 'Error fetching inserted row' });
-            }
+	// pool.query('INSERT INTO requisition_lisiting (rmnm, whid, packingno, categid, subcategid, typeid, matid, quantity, receivedqty, remainingqty, unit, addqty, rmqty, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [rmnm, slctwrhs, packingno, shpcat, slctshpsubcat, shptype, shpmatname, shppurchase, shpreceived, shpremaining, shounit, shpupdatedqty, shpremainingqty, created_at, created_at], (error, results, fields) => {
+	// 	if (error) {
+	// 		console.error('Error executing SQL query:', error);
+	// 	  return response.status(500).json({ error: 'Requisition not found' });
+	// 	}
+	// 	// if(results.length === 0){
+	// 	// 	return response.status(500).json({ error: 'Requisition Listing not created in database' });
+	// 	// }
+	// 	// return response.json({ message: 'Response: Requisition Listing created successfully!', data: results});
+	// 	pool.query('SELECT * FROM requisition_lisiting WHERE id = ?', results.insertId, (selectError, selectResults, selectFields) => {
+    //         if (selectError) {
+    //             return response.status(500).json({ error: 'Error fetching inserted row' });
+    //         }
 
-            // Check if any rows were returned
-            if (selectResults.length === 0) {
-                return response.status(500).json({ error: 'Inserted row not found' });
-            }
+    //         // Check if any rows were returned
+    //         if (selectResults.length === 0) {
+    //             return response.status(500).json({ error: 'Inserted row not found' });
+    //         }
 
-            // Return the inserted row's data
-            return response.json({ message: 'Response: Requisition Listing created successfully!', data: selectResults[0] });
-        });
-	});
+    //         // Return the inserted row's data
+    //         return response.json({ message: 'Response: Requisition Listing created successfully!', data: selectResults[0] });
+    //     });
+	// });
+	// Retrieve existing shpupdatedqty values for the given rmnm
+    pool.query('SELECT SUM(addqty) AS totalUpdatedQty FROM requisition_lisiting WHERE matid = ?', shpmatname, (selectError, selectResults, selectFields) => {
+        if (selectError) {
+            console.error('Error executing SQL query:', selectError);
+            return response.status(500).json({ error: 'Error fetching existing shpupdatedqty' });
+        }
+
+        const existingTotalUpdatedQty = selectResults[0].totalUpdatedQty || 0;
+		let num11 = parseInt(shpupdatedqty);
+		let num122 = parseInt(existingTotalUpdatedQty);
+        const upcomingTotalUpdatedQty = num122 + num11;
+		let num = parseInt(shpaddedqty);
+
+        // Check if the sum of existing and upcoming shpupdatedqty is less than shpreceived
+		// console.log("upcomingTotalUpdatedQty: "+upcomingTotalUpdatedQty);
+		// console.log("shpaddedqty: "+shpaddedqty);
+        if (upcomingTotalUpdatedQty <= num) {
+            pool.query('INSERT INTO requisition_lisiting (rmnm, whid, packingno, categid, subcategid, typeid, matid, quantity, receivedqty, remainingqty, unit, addqty, rmqty, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [rmnm, slctwrhs, packingno, shpcat, slctshpsubcat, shptype, shpmatname, shppurchase, shpreceived, shpremaining, shounit, shpupdatedqty, shpremainingqty, created_at, created_at], (error, results, fields) => {
+			if (error) {
+				console.error('Error executing SQL query:', error);
+			return response.status(500).json({ error: 'Requisition not found' });
+			}
+			pool.query('SELECT * FROM requisition_lisiting WHERE id = ?', results.insertId, (selectError, selectResults, selectFields) => {
+				if (selectError) {
+					return response.status(500).json({ error: 'Error fetching inserted row' });
+				}
+				if (selectResults.length === 0) {
+					return response.status(500).json({ error: 'Inserted row not found' });
+				}
+				return response.json({ message: 'Response: Requisition Listing created successfully!', data: selectResults[0] });
+			});
+		});
+        } else {
+            return response.status(400).json({ error: 'Sum of updated quantities exceeds received quantity' });
+        }
+    });
 });
 app.post('/update-requisitionlisiting', upload.none(),  (request, response) => {
 	const listid = request.body.listid;
